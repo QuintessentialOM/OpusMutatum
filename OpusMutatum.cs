@@ -20,34 +20,32 @@ using TypeReference = Mono.Cecil.TypeReference;
 namespace OpusMutatum {
 
 	public static class OpusMutatum {
-        static string PathToOutput = "modded";
-        static string PathToTemporaryOutput = "modded/temp";
+		static string PathToOutput = "modded";
+		static string PathToTemporaryOutput = "modded/temp";
 
 		// For intermediary or devExe
 		static string PathToLightning = "Lightning.exe";
-        static string PathToIntermediaryLightning = "IntermediaryLightning.exe";
+		static string PathToIntermediaryLightning = "IntermediaryLightning.exe";
 		static string PathToModdedLightning = "ModdedLightning.exe";
 
 		// for merge
-		static string PathToMonoMod = "MonoMod.exe";
-        static string PathToHookGen = "MonoMod.RuntimeDetour.HookGen.exe";
-        static string PathToQuintessential = "Quintessential.dll";
+		static string PathToQuintessential = "Quintessential.dll";
 
 		// for strings
 		static string StringDeobfName = null;
 		static string StringDeobfIntermediaryName = "method_131";
 
-        // for coreification
-        static string PathToCoreifier = "Coreifier.dll";
-        static Assembly CoreifierAssembly;
-        static MethodInfo CoreifierEntryPoint;
+		// for coreification
+		static string PathToCoreifier = "Coreifier.dll";
+		static Assembly CoreifierAssembly;
+		static MethodInfo CoreifierEntryPoint;
 
-        static string[] QuintessentialSystemLibs = []; // TODO: what goes in here? do we even need this?
-        static string[] MonoSystemLibs = ["mscorlib.dll", "Mono.Posix.dll", "Mono.Security.dll"];
-        static string[] MonoConfigFiles = ["monoconfig", "monomachineconfig"];
+		static string[] QuintessentialSystemLibs = []; // TODO: what goes in here? do we even need this?
+		static string[] MonoSystemLibs = ["mscorlib.dll", "Mono.Posix.dll", "Mono.Security.dll"];
+		static string[] MonoConfigFiles = ["monoconfig", "monomachineconfig"];
 
-        // for mappings
-        static string PathToMappings = "Mappings";
+		// for mappings
+		static string PathToMappings = "Mappings";
 		static List<string> IntermediaryToNamedMappingPaths = new List<string>();
 		static List<string> ObfToIntermediaryMappingPaths = new List<string>();
 		static List<string> StringsPaths = new List<string>();
@@ -59,9 +57,9 @@ namespace OpusMutatum {
 		static Dictionary<int, string> Strings = new Dictionary<int, string>();
 
 		static bool AutoExit = false;
-        private static bool NamedOut = false;
-        // OS enum, since Linux and Mac are different
-        public enum OS {
+		private static bool NamedOut = false;
+		// OS enum, since Linux and Mac are different
+		public enum OS {
 			Windows,
 			Linux,
 			Mac
@@ -102,15 +100,15 @@ namespace OpusMutatum {
 							action = RunAction.Intermediary;
 						else if(arg.Equals("merge"))
 							action = RunAction.Merge;
-                        else if (arg.Equals("coreify"))
-                            action = RunAction.Coreify;
+						else if (arg.Equals("coreify"))
+							action = RunAction.Coreify;
 						else if(arg.Equals("setup"))
 							action = RunAction.Setup;
 						else if(arg.Equals("devExe"))
 							action = RunAction.DevExe;
-                        else if (arg.Equals("quintDevExe"))
-                            action = RunAction.QuintDevExe;
-                        else if(arg.Equals("--mappings"))
+						else if (arg.Equals("quintDevExe"))
+							action = RunAction.QuintDevExe;
+						else if(arg.Equals("--mappings"))
 							current = ArgumentParsingMode.IntermediaryToNamedMappingPath;
 						else if(arg.Equals("--intermediary"))
 							current = ArgumentParsingMode.ObfToIntermediaryMappingPath;
@@ -118,8 +116,6 @@ namespace OpusMutatum {
 							current = ArgumentParsingMode.StringsPath;
 						else if(arg.Equals("--lightning"))
 							current = ArgumentParsingMode.LightningPath;
-						else if(arg.Equals("--monomod"))
-							current = ArgumentParsingMode.MonoModPath;
 						else if(arg.Equals("--stringdeobfname"))
 							current = ArgumentParsingMode.StringDeobfName;
 						else if(arg.Equals("--stringdeobfintname"))
@@ -130,11 +126,11 @@ namespace OpusMutatum {
 							OpSystem = OS.Mac;
 						else if(arg.Equals("--win"))
 							OpSystem = OS.Windows;
-                        else if (arg.Equals("--autoExit"))
-                            AutoExit = true;
-                        else if (arg.Equals("--namedExe"))
-                            NamedOut = true;
-                        break;
+						else if (arg.Equals("--autoExit"))
+							AutoExit = true;
+						else if (arg.Equals("--namedExe"))
+							NamedOut = true;
+						break;
 					case ArgumentParsingMode.IntermediaryToNamedMappingPath:
 						IntermediaryToNamedMappingPaths.Add(arg);
 						current = ArgumentParsingMode.Argument;
@@ -149,10 +145,6 @@ namespace OpusMutatum {
 						break;
 					case ArgumentParsingMode.LightningPath:
 						PathToLightning = arg;
-						current = ArgumentParsingMode.Argument;
-						break;
-					case ArgumentParsingMode.MonoModPath:
-						PathToMonoMod = arg;
 						current = ArgumentParsingMode.Argument;
 						break;
 					case ArgumentParsingMode.StringDeobfName:
@@ -174,19 +166,19 @@ namespace OpusMutatum {
 				StringsPaths.Add(Path.Combine(PathToOutput, "out.csv"));
 			}
 
-            DirectoryInfo mappingsDirectory = Directory.CreateDirectory(Path.Combine(PathToOutput, PathToMappings));
+			DirectoryInfo mappingsDirectory = Directory.CreateDirectory(Path.Combine(PathToOutput, PathToMappings));
 			if (ObfToIntermediaryMappingPaths.Count == 0) {
 				foreach (var path in mappingsDirectory.GetFiles()) {
 					ObfToIntermediaryMappingPaths.Add(path.FullName);
 				}
 			}
-            if (IntermediaryToNamedMappingPaths.Count == 0) {
-                foreach (var path in mappingsDirectory.GetFiles()) {
-                    IntermediaryToNamedMappingPaths.Add(path.FullName);
-                }
-            }
+			if (IntermediaryToNamedMappingPaths.Count == 0) {
+				foreach (var path in mappingsDirectory.GetFiles()) {
+					IntermediaryToNamedMappingPaths.Add(path.FullName);
+				}
+			}
 
-            HandleSetup();
+			HandleSetup();
 
 			try {
 				switch(action) {
@@ -199,22 +191,22 @@ namespace OpusMutatum {
 					case RunAction.Merge:
 						HandleMerge();
 						break;
-                    case RunAction.Coreify:
-                        HandleCoreify();
-                        break;
+					case RunAction.Coreify:
+						HandleCoreify();
+						break;
 					case RunAction.Setup:
-                        HandleCoreify();
+						HandleCoreify();
 						HandleStrings();
 						HandleIntermediary();
-                        if (NamedOut) {
-                            HandleQuintDevExe();
-                        }
-                        HandleMerge();
+						if (NamedOut) {
+							HandleQuintDevExe();
+						}
+						HandleMerge();
 						break;
 					case RunAction.QuintDevExe:
-                        HandleQuintDevExe();
-                        break;
-                    case RunAction.DevExe:
+						HandleQuintDevExe();
+						break;
+					case RunAction.DevExe:
 						HandleDevExe();
 						break;
 					case RunAction.Run:
@@ -230,17 +222,17 @@ namespace OpusMutatum {
 			// keep command line open
 			if (!AutoExit) Console.ReadKey();
 
-            HandleCleanup();
+			HandleCleanup();
 		}
 
-        static void HandleSetup() {
-            Directory.CreateDirectory(PathToOutput);
-            Directory.CreateDirectory(PathToTemporaryOutput);
-        }
+		static void HandleSetup() {
+			Directory.CreateDirectory(PathToOutput);
+			Directory.CreateDirectory(PathToTemporaryOutput);
+		}
 
-        static void HandleCleanup() {
-            Directory.Delete(PathToTemporaryOutput, true);
-        }
+		static void HandleCleanup() {
+			Directory.Delete(PathToTemporaryOutput, true);
+		}
 
 		static void HandleRun() {
 			// just run MONOMODDED_IntermediaryLightning.exe
@@ -353,8 +345,8 @@ namespace OpusMutatum {
 			proc.Append(proc.Create(OpCodes.Callvirt, dispose));
 			proc.Append(proc.Create(OpCodes.Ret));
 
-            string stringDumpingDir = Path.Combine(PathToOutput, "StringDumping");
-            string stringDumperPath = Path.Combine(stringDumpingDir, "StringDumper.exe");
+			string stringDumpingDir = Path.Combine(PathToOutput, "StringDumping");
+			string stringDumperPath = Path.Combine(stringDumpingDir, "StringDumper.exe");
 			Directory.CreateDirectory(stringDumpingDir);
 			module.Write(stringDumperPath);
 
@@ -364,10 +356,10 @@ namespace OpusMutatum {
 				File.Copy("./Steamworks.NET.dll", Path.Combine(stringDumpingDir, "Steamworks.NET.dll"));
 			}
 			Console.WriteLine("Running string dumper...");
-            // run the string dumper automatically
-            // Need to set the executable flag on unix
-            if (Environment.OSVersion.Platform == PlatformID.Unix)
-                File.SetUnixFileMode(stringDumperPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+			// run the string dumper automatically
+			// Need to set the executable flag on unix
+			if (Environment.OSVersion.Platform == PlatformID.Unix)
+				File.SetUnixFileMode(stringDumperPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
 			RunAndWait(stringDumperPath, "");
 			Console.WriteLine();
 		}
@@ -409,75 +401,75 @@ namespace OpusMutatum {
 		static bool LoadLightning() {
 			Console.WriteLine("Reading Lightning.exe...");
 
-            try {
-                LightningAssemblyDef = AssemblyDefinition.ReadAssembly(Path.Combine(PathToOutput, PathToLightning))
-                    ?? throw new Exception("Failed to read assembly definition.");
-            } catch (Exception e) {
-                Console.WriteLine($"Failed to load Lightning.exe: {e.Message}");
-                return false;
-            }
+			try {
+				LightningAssemblyDef = AssemblyDefinition.ReadAssembly(Path.Combine(PathToOutput, PathToLightning))
+					?? throw new Exception("Failed to read assembly definition.");
+			} catch (Exception e) {
+				Console.WriteLine($"Failed to load Lightning.exe: {e.Message}");
+				return false;
+			}
 			Console.WriteLine("Found Lightning executable: " + LightningAssemblyDef.FullName);
-            return true;
-        }
+			return true;
+		}
 
 		static bool LoadModdedLightning() {
-            Console.WriteLine("Reading modded Lightning.exe...");
+			Console.WriteLine("Reading modded Lightning.exe...");
 
-            try {
-                string moddedLightningPath = Path.Combine(PathToOutput, PathToModdedLightning);
-                ModdedLightningAssemblyDef = AssemblyDefinition.ReadAssembly(moddedLightningPath)
-                    ?? throw new Exception("Failed to read assembly definition.");
-            } catch (Exception e) {
-                Console.WriteLine($"Failed to load modded Lightning.exe: {e.Message}");
-                return false;
-            }
+			try {
+				string moddedLightningPath = Path.Combine(PathToOutput, PathToModdedLightning);
+				ModdedLightningAssemblyDef = AssemblyDefinition.ReadAssembly(moddedLightningPath)
+					?? throw new Exception("Failed to read assembly definition.");
+			} catch (Exception e) {
+				Console.WriteLine($"Failed to load modded Lightning.exe: {e.Message}");
+				return false;
+			}
 
-            Console.WriteLine("Found modded Lightning executable: " + ModdedLightningAssemblyDef.FullName);
-            return true;
-        }
+			Console.WriteLine("Found modded Lightning executable: " + ModdedLightningAssemblyDef.FullName);
+			return true;
+		}
 
-        static bool LoadIntermediaryLightning() {
-            Console.WriteLine("Reading intermediary Lightning.exe...");
+		static bool LoadIntermediaryLightning() {
+			Console.WriteLine("Reading intermediary Lightning.exe...");
 
-            try {
-                string intermediaryLightningPath = Path.Combine(PathToOutput, PathToIntermediaryLightning);
-                IntermediaryLightningAssemblyDef = AssemblyDefinition.ReadAssembly(intermediaryLightningPath)
-                    ?? throw new Exception("Failed to read assembly definition.");
-            } catch (Exception e) {
-                Console.WriteLine($"Failed to load intermediary Lightning.exe: {e.Message}");
-                return false;
-            }
+			try {
+				string intermediaryLightningPath = Path.Combine(PathToOutput, PathToIntermediaryLightning);
+				IntermediaryLightningAssemblyDef = AssemblyDefinition.ReadAssembly(intermediaryLightningPath)
+					?? throw new Exception("Failed to read assembly definition.");
+			} catch (Exception e) {
+				Console.WriteLine($"Failed to load intermediary Lightning.exe: {e.Message}");
+				return false;
+			}
 
-            Console.WriteLine("Found intermediary Lightning executable: " + IntermediaryLightningAssemblyDef.FullName);
-            return true;
-        }
+			Console.WriteLine("Found intermediary Lightning executable: " + IntermediaryLightningAssemblyDef.FullName);
+			return true;
+		}
 
-        static bool LoadCoreifier() {
-            if (!File.Exists(PathToCoreifier)) {
-                Console.WriteLine("Coreifier.dll not found");
-                return false;
-            }
-            Console.WriteLine("Reading Coreifier.dll...");
+		static bool LoadCoreifier() {
+			if (!File.Exists(PathToCoreifier)) {
+				Console.WriteLine("Coreifier.dll not found");
+				return false;
+			}
+			Console.WriteLine("Reading Coreifier.dll...");
 
-            try {
-                CoreifierAssembly = Assembly.LoadFrom(PathToCoreifier);
-            } catch (Exception e) {
-                Console.WriteLine($"Failed to load Coreifier.dll: {e.Message}");
-                return false;
-            }
-            Console.WriteLine("Found Coreifier.dll: " + CoreifierAssembly.FullName);
+			try {
+				CoreifierAssembly = Assembly.LoadFrom(PathToCoreifier);
+			} catch (Exception e) {
+				Console.WriteLine($"Failed to load Coreifier.dll: {e.Message}");
+				return false;
+			}
+			Console.WriteLine("Found Coreifier.dll: " + CoreifierAssembly.FullName);
 
-            CoreifierEntryPoint = CoreifierAssembly?
-                .GetType("Coreifier.Coreifier")?
-                .GetMethod("Coreify", BindingFlags.Public | BindingFlags.Static, null, [typeof(string), typeof(string)], null);
-            if (CoreifierEntryPoint == null) {
-                Console.WriteLine("Failed to find coreifier entrypoint.");
-                return false;
-            }
-            Console.WriteLine("Found coreifier entrypoint.");
+			CoreifierEntryPoint = CoreifierAssembly?
+				.GetType("Coreifier.Coreifier")?
+				.GetMethod("Coreify", BindingFlags.Public | BindingFlags.Static, null, [typeof(string), typeof(string)], null);
+			if (CoreifierEntryPoint == null) {
+				Console.WriteLine("Failed to find coreifier entrypoint.");
+				return false;
+			}
+			Console.WriteLine("Found coreifier entrypoint.");
 
-            return true;
-        }
+			return true;
+		}
 
 		static bool LoadStrings() {
 			if(StringsPaths.Count > 0) {
@@ -502,11 +494,11 @@ namespace OpusMutatum {
 					}
 				}
 				Console.WriteLine("Loaded " + Strings.Count + " strings.");
-                return true;
-            }
+				return true;
+			}
 
-            return false;
-        }
+			return false;
+		}
 
 		public static void DoRemap(Remapper remapper, Collection<TypeDefinition> types, Action<MethodReference, string, Instruction> onMethodReference, Action<TypeDefinition> onTypeDefinition) {
 			// Renames are deferred so that everything compares against old names, rather than a mixture of old and new names
@@ -575,155 +567,163 @@ namespace OpusMutatum {
 		}
 
 		static void HandleMerge() {
-			// run "./MonoMod.exe IntermediaryLightning.exe Quintessential.dll ModdedLightning.exe"
-			// then "./MonoMod.RuntimeDetour.HookGen.exe ModdedLightning.exe"
-			if(File.Exists(PathToMonoMod)) {
-				if(File.Exists(PathToQuintessential)) {
-					// TODO: check if there's already quintessential with this version
-					Console.WriteLine("Modding Lightning...");
-                    string moddedOutputPath = Path.Combine(PathToOutput, PathToModdedLightning);
-					string moodedInputPath =  Path.Combine(PathToOutput, NamedOut ? "QuintDevLightning.exe" : PathToIntermediaryLightning);
-                    RunAndWait(Path.Combine(Directory.GetCurrentDirectory(), PathToMonoMod), $"{moodedInputPath} {PathToQuintessential} {moddedOutputPath}");
-					if(!File.Exists(moddedOutputPath)) {
-						Console.WriteLine("Failed to mod!");
-						return;
-					}
-					if(File.Exists(PathToHookGen)) {
-						Console.WriteLine("Generating hooks...");
-						RunAndWait(Path.Combine(Directory.GetCurrentDirectory(), PathToHookGen), moddedOutputPath);
-						if(OpSystem != OS.Windows) {
-							// Fixes the SDL2.dll not found error
-							File.Copy("./Lightning.exe.config", Path.Combine(PathToOutput, Path.ChangeExtension(PathToModdedLightning, ".exe.config")), true);
-							// These are the files you run to make the thing do the thing. yes
-							File.Copy("./Lightning.bin.x86", Path.Combine(PathToOutput, Path.ChangeExtension(PathToModdedLightning, ".bin.x86")), true);
-							File.Copy("./Lightning.bin.x86_64", Path.Combine(PathToOutput, Path.ChangeExtension(PathToModdedLightning, ".bin.x86_64")), true);
-						}
-					}
-				} else {
-					Console.WriteLine("Quintessential not found, skipping merging.");
+			if (File.Exists(PathToQuintessential)) {
+				Console.WriteLine("Modding Lightning...");
+				string moddedOutputPath = Path.Combine(PathToOutput, PathToModdedLightning);
+				string moodedInputPath = Path.Combine(PathToOutput, NamedOut ? "QuintDevLightning.exe" : PathToIntermediaryLightning);
+
+				using (MergeModder modder = new() {
+					InputPath = moodedInputPath,
+					OutputPath = moddedOutputPath,
+					MissingDependencyThrow = false,
+					LogVerboseEnabled = false
+				}) {
+					modder.Read();
+					modder.ReadMod(PathToQuintessential);
+					modder.MapDependencies();
+					modder.AutoPatch();
+					modder.Write(null, null);
+					modder.Log("[Main] Done.");
 				}
+
+				//RunAndWait(Path.Combine(Directory.GetCurrentDirectory(), PathToMonoMod), $"{moodedInputPath} {PathToQuintessential} {moddedOutputPath}");
+				//if (!File.Exists(moddedOutputPath)) {
+				//	Console.WriteLine("Failed to mod!");
+				//	return;
+				//}
+				//if (File.Exists(PathToHookGen)) {
+				//	Console.WriteLine("Generating hooks...");
+				//	RunAndWait(Path.Combine(Directory.GetCurrentDirectory(), PathToHookGen), moddedOutputPath);
+				//	if (OpSystem != OS.Windows) {
+				//		// Fixes the SDL2.dll not found error
+				//		File.Copy("./Lightning.exe.config", Path.Combine(PathToOutput, Path.ChangeExtension(PathToModdedLightning, ".exe.config")), true);
+				//		// These are the files you run to make the thing do the thing. yes
+				//		File.Copy("./Lightning.bin.x86", Path.Combine(PathToOutput, Path.ChangeExtension(PathToModdedLightning, ".bin.x86")), true);
+				//		File.Copy("./Lightning.bin.x86_64", Path.Combine(PathToOutput, Path.ChangeExtension(PathToModdedLightning, ".bin.x86_64")), true);
+				//	}
+				//}
 			} else {
-				Console.WriteLine("MonoMod not found, skipping merging.");
+				Console.WriteLine("Quintessential not found, skipping merging.");
 			}
 			Console.WriteLine();
 		}
 
-        // TODO: setup native libs + symlinks aaaa
-        static void HandleCoreify() {
-            if (!File.Exists(PathToLightning)) {
-                Console.WriteLine("Failed to find Lightning.exe");
-                return;
-            }
+		// TODO: setup native libs + symlinks aaaa
+		static void HandleCoreify() {
+			if (!File.Exists(PathToLightning)) {
+				Console.WriteLine("Failed to find Lightning.exe");
+				return;
+			}
 
-            if (!LoadCoreifier()) {
-                Console.WriteLine("Unable to load coreifier, skipping coreification!");
-                return;
-            }
+			if (!LoadCoreifier()) {
+				Console.WriteLine("Unable to load coreifier, skipping coreification!");
+				return;
+			}
 
-            Coreify(PathToLightning, Path.Combine(PathToOutput, PathToLightning));
-            foreach (string path in MonoConfigFiles)
-                File.Copy(path, Path.Combine(PathToOutput, path), overwrite: true);
+			Coreify(PathToLightning, Path.Combine(PathToOutput, PathToLightning));
+			foreach (string path in MonoConfigFiles)
+				File.Copy(path, Path.Combine(PathToOutput, path), overwrite: true);
 
-            Console.WriteLine();
-        }
+			Console.WriteLine();
+		}
 
-        static void Coreify(string asmFrom, string asmTo = null, HashSet<string> convertedAsms = null) {
-            asmTo ??= asmFrom;
-            convertedAsms ??= [];
-            if (!File.Exists(asmFrom)) {
-                Console.WriteLine($"Unable to load assembly {asmFrom}, skipping coreification!");
-                return;
-            }
-            if (!convertedAsms.Add(asmFrom))
-                return;
+		static void Coreify(string asmFrom, string asmTo = null, HashSet<string> convertedAsms = null) {
+			asmTo ??= asmFrom;
+			convertedAsms ??= [];
+			if (!File.Exists(asmFrom)) {
+				Console.WriteLine($"Unable to load assembly {asmFrom}, skipping coreification!");
+				return;
+			}
+			if (!convertedAsms.Add(asmFrom))
+				return;
 
-            // coreify dependencies first
-            string[] deps = GetAssemblyReferences(asmFrom).Keys.ToArray();
+			// coreify dependencies first
+			string[] deps = GetAssemblyReferences(asmFrom).Keys.ToArray();
             if (deps.Contains("Coreifier"))
                 return;
 
-            foreach (string dep in deps) {
-                string srcDepPath = Path.Combine(Path.GetDirectoryName(asmFrom)!, $"{dep}.dll");
-                string dstDepPath = Path.Combine(Path.GetDirectoryName(asmTo)!, $"{dep}.dll");
+			foreach (string dep in deps) {
+				string srcDepPath = Path.Combine(Path.GetDirectoryName(asmFrom)!, $"{dep}.dll");
+				string dstDepPath = Path.Combine(Path.GetDirectoryName(asmTo)!, $"{dep}.dll");
 
-                // recursively handle dependencies
-                if (File.Exists(srcDepPath)) {
-                    if (!IsSystemLibrary(srcDepPath))
-                        // only coreify non-system deps
-                        Coreify(srcDepPath, dstDepPath, convertedAsms);
-                    else if (srcDepPath != dstDepPath)
-                        // otherwise copy the dep
-                        File.Copy(srcDepPath, dstDepPath, overwrite: true);
-                } else if (File.Exists(dstDepPath) && !IsSystemLibrary(srcDepPath))
-                    // only coreify non-system deps
-                    Coreify(dstDepPath, convertedAsms: convertedAsms);
-            }
+				// recursively handle dependencies
+				if (File.Exists(srcDepPath)) {
+					if (!IsSystemLibrary(srcDepPath))
+						// only coreify non-system deps
+						Coreify(srcDepPath, dstDepPath, convertedAsms);
+					else if (srcDepPath != dstDepPath)
+						// otherwise copy the dep
+						File.Copy(srcDepPath, dstDepPath, overwrite: true);
+				} else if (File.Exists(dstDepPath) && !IsSystemLibrary(srcDepPath))
+					// only coreify non-system deps
+					Coreify(dstDepPath, convertedAsms: convertedAsms);
+			}
 
-            CoreifySingle(asmFrom, asmTo);
-            return;
+			CoreifySingle(asmFrom, asmTo);
+			return;
 
-            static Dictionary<string, Version> GetAssemblyReferences(string path) {
-                using FileStream fs = File.OpenRead(path);
-                using PEReader pe = new(fs);
+			static Dictionary<string, Version> GetAssemblyReferences(string path) {
+				using FileStream fs = File.OpenRead(path);
+				using PEReader pe = new(fs);
 
-                MetadataReader meta = pe.GetMetadataReader();
+				MetadataReader meta = pe.GetMetadataReader();
 
-                Dictionary<string, Version> deps = new();
-                foreach (AssemblyReference asmRef in meta.AssemblyReferences.Select(meta.GetAssemblyReference))
-                    deps.TryAdd(meta.GetString(asmRef.Name), asmRef.Version);
+				Dictionary<string, Version> deps = new();
+				foreach (AssemblyReference asmRef in meta.AssemblyReferences.Select(meta.GetAssemblyReference))
+					deps.TryAdd(meta.GetString(asmRef.Name), asmRef.Version);
 
-                return deps;
-            }
+				return deps;
+			}
 
-            static bool IsSystemLibrary(string file) {
-                if (Path.GetExtension(file) != ".dll")
-                    return false;
+			static bool IsSystemLibrary(string file) {
+				if (Path.GetExtension(file) != ".dll")
+					return false;
 
-                if (Path.GetFileName(file).StartsWith("System.") &&
-                    !QuintessentialSystemLibs.Contains(Path.GetFileName(file)))
-                    return true;
+				if (Path.GetFileName(file).StartsWith("System.") &&
+					!QuintessentialSystemLibs.Contains(Path.GetFileName(file)))
+					return true;
 
-                return MonoSystemLibs.Any(name => Path.GetFileName(file).Equals(name, StringComparison.OrdinalIgnoreCase));
-            }
-        }
+				return MonoSystemLibs.Any(name => Path.GetFileName(file).Equals(name, StringComparison.OrdinalIgnoreCase));
+			}
+		}
 
-        static void CoreifySingle(string asmFrom, string asmTo) {
-            Console.WriteLine($"Converting {asmFrom} to .NET Core...");
+		static void CoreifySingle(string asmFrom, string asmTo) {
+			Console.WriteLine($"Converting {asmFrom} to .NET Core...");
 
-            string asmTmp = Path.Combine(PathToTemporaryOutput, Path.GetFileName(asmTo));
-            try {
-                CoreifierEntryPoint.Invoke(null, [asmFrom, asmTmp]);
-                File.Move(asmTmp, asmTo, overwrite: true);
-            } finally {
-                File.Delete(asmTmp);
-                File.Delete(Path.ChangeExtension(asmTmp, "pdb"));
-                File.Delete(Path.ChangeExtension(asmTmp, "mdb"));
-            }
-        }
+			string asmTmp = Path.Combine(PathToTemporaryOutput, Path.GetFileName(asmTo));
+			try {
+				CoreifierEntryPoint.Invoke(null, [asmFrom, asmTmp]);
+				File.Move(asmTmp, asmTo, overwrite: true);
+			} finally {
+				File.Delete(asmTmp);
+				File.Delete(Path.ChangeExtension(asmTmp, "pdb"));
+				File.Delete(Path.ChangeExtension(asmTmp, "mdb"));
+			}
+		}
 
 		static void HandleDevExe() {
 			// take ModdedLightning.exe, remap to named
 			Console.WriteLine("Generating dev EXE...");
 
 			if (!LoadModdedLightning()) return;
-            if (!LoadIntermediaryToNamedMappings()) return;
+			if (!LoadIntermediaryToNamedMappings()) return;
 
 			DoRemap(new NamedRemapper(), CollectNestedTypes(ModdedLightningAssemblyDef.MainModule.Types), (mref, newName, instr) => { }, typeDef => { });
 			ModdedLightningAssemblyDef.Write(Path.Combine(PathToOutput, "DevLightning.exe"));
 			Console.WriteLine();
 		}
-        static void HandleQuintDevExe() {
-            // take IntermediaryLightning.exe, remap to named (no merged quintessential)
-            Console.WriteLine("Generating dev quint EXE...");
+		static void HandleQuintDevExe() {
+			// take IntermediaryLightning.exe, remap to named (no merged quintessential)
+			Console.WriteLine("Generating dev quint EXE...");
 
-            if (!LoadIntermediaryLightning()) return;
-            if (!LoadIntermediaryToNamedMappings()) return;
+			if (!LoadIntermediaryLightning()) return;
+			if (!LoadIntermediaryToNamedMappings()) return;
 
-            DoRemap(new NamedRemapper(), CollectNestedTypes(IntermediaryLightningAssemblyDef.MainModule.Types), (mref, newName, instr) => { }, typeDef => { });
-            IntermediaryLightningAssemblyDef.Write(Path.Combine(PathToOutput, "QuintDevLightning.exe"));
-            Console.WriteLine();
-        }
-        static void RunAndWait(string file, string param){
+			DoRemap(new NamedRemapper(), CollectNestedTypes(IntermediaryLightningAssemblyDef.MainModule.Types), (mref, newName, instr) => { }, typeDef => { });
+			IntermediaryLightningAssemblyDef.Write(Path.Combine(PathToOutput, "QuintDevLightning.exe"));
+			Console.WriteLine();
+		}
+		static void RunAndWait(string file, string param){
 			Console.WriteLine("Running " + file);
 			if(!File.Exists(file)) {
 				Console.WriteLine("Failed to run " + file + ", file not found.");
@@ -787,16 +787,16 @@ namespace OpusMutatum {
 		}
 
 		static bool LoadIntermediaryToNamedMappings() {
-            bool loaded = false;
+			bool loaded = false;
 			foreach(var path in IntermediaryToNamedMappingPaths) {
 				if(!File.Exists(path))
 					continue;
 
 				string[] lines = File.ReadAllLines(path);
 				if (lines.Length <= 1 || !lines[0].StartsWith("Mapping version: ")) continue;
-                Console.WriteLine("Found valid named mappings: " + Path.GetFileName(path));
+				Console.WriteLine("Found valid named mappings: " + Path.GetFileName(path));
 
-                for (int i = 1; i < lines.Length; i++) {
+				for (int i = 1; i < lines.Length; i++) {
 					var line = lines[i];
 
 					if(string.IsNullOrWhiteSpace(line) || line.StartsWith("#"))
@@ -806,13 +806,13 @@ namespace OpusMutatum {
 					string[] parts = line.Split(',');
 					IntermediaryToNamedMappings[parts[0]] = parts[1];
 				}
-                loaded = true;
-            }
+				loaded = true;
+			}
 
-            if (!loaded)
-                Console.WriteLine("Failed to find valid named mappings!");
-            return loaded;
-        }
+			if (!loaded)
+				Console.WriteLine("Failed to find valid named mappings!");
+			return loaded;
+		}
 
 		class IntermediaryRemapper : Remapper
 		{
@@ -857,12 +857,12 @@ namespace OpusMutatum {
 			}
 
 			private MethodMapping FindMethod(MethodReference method) {
-                // TODO: generic params stripped when matching method signatures due to Cecil handling generic instance method references strangely
-                // probably not ideal, but maybe it's fine?
-                return FindType(method.DeclaringType)?.Methods.Where(m => {
+				// TODO: generic params stripped when matching method signatures due to Cecil handling generic instance method references strangely
+				// probably not ideal, but maybe it's fine?
+				return FindType(method.DeclaringType)?.Methods.Where(m => {
 					return m.MethodNameA == method.Name
 							&& (m.ReturnTypeFullNameA.Split('`')[0] == method.ReturnType.FullName.Split('`')[0] || method.ReturnType.FullName.StartsWith("!"))
-                            && m.ArgumentTypeFullNamesA.Count == method.Parameters.Count
+							&& m.ArgumentTypeFullNamesA.Count == method.Parameters.Count
 							&& m.ArgumentTypeFullNamesA.Zip(method.Parameters, (a,b)=>(a,b)).All(pair => pair.b.ParameterType.FullName.StartsWith("!") || pair.a.Split('`', '<')[0] == pair.b.ParameterType.FullName.Split('`', '<')[0]);
 				}).SingleOrNull();
 			}
@@ -877,21 +877,21 @@ namespace OpusMutatum {
 				using (StreamReader file = File.OpenText(path)) {
 					try {
 						ObfToIntermediaryMappings = new JsonSerializer().Deserialize<Mappings>(new JsonTextReader(file));
-                    } catch {
+					} catch {
 						continue;
-                    }
+					}
 
-                    Console.WriteLine("Found valid intermediary mappings: " + Path.GetFileName(path));
-                    return true;
-                }
+					Console.WriteLine("Found valid intermediary mappings: " + Path.GetFileName(path));
+					return true;
+				}
 			}
 
-            Console.WriteLine("Failed to find valid intermediary mappings!");
-            return false;
-        }
+			Console.WriteLine("Failed to find valid intermediary mappings!");
+			return false;
+		}
 
 		enum ArgumentParsingMode{
-			Argument, IntermediaryToNamedMappingPath, ObfToIntermediaryMappingPath, StringsPath, LightningPath, MonoModPath,
+			Argument, IntermediaryToNamedMappingPath, ObfToIntermediaryMappingPath, StringsPath, LightningPath,
 			StringDeobfName, StringDeobfIntermediaryName
 		}
 

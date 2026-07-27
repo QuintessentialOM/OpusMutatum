@@ -210,7 +210,6 @@ public static class OpusMutatum {
 
     private static void HandleDependencies() {
         Console.WriteLine("Setting up native libraries...");
-        DependencyHandling.DeleteSystemLibs();
         DependencyHandling.SetupNativeLibs();
 
         Console.WriteLine("Creating symlinks and required files...");

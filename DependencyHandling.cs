@@ -76,27 +76,6 @@ public static partial class DependencyHandling {
         }
     }
 
-    public static void DeleteSystemLibs() {
-        Console.WriteLine("Deleting system libraries...");
-
-        foreach (string file in Directory.GetFiles(Globals.PathToOutput)) {
-            if (!IsSystemLib(file))
-                continue;
-
-            Console.WriteLine($"Deleting {file}...");
-            File.Delete(file);
-        }
-    }
-
-    public static void DeleteMonoKickstartFiles() {
-        File.Delete(Path.ChangeExtension(Globals.PathToLightningExe, ".bin.x86")!);
-        File.Delete(Path.ChangeExtension(Globals.PathToLightningExe, ".bin.x86_64")!);
-
-        File.Delete(Path.ChangeExtension(Globals.PathToLightningExe, ".exe.config")!);
-        File.Delete(Path.Combine(Path.GetDirectoryName(Globals.PathToLightningExe)!, "monoconfig"));
-        File.Delete(Path.Combine(Path.GetDirectoryName(Globals.PathToLightningExe)!, "monomachineconfig"));
-    }
-
     public static void SetupNativeLibs() {
         string[] sourceLibPaths = []; // later entries take priority
         string libDestinationDir;

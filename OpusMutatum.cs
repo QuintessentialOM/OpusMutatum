@@ -259,7 +259,6 @@ public static class OpusMutatum {
         // then "./MonoMod.RuntimeDetour.HookGen.exe ModdedLightning.exe"
         Console.WriteLine("Merging Quintessential...");
         Patching.RunMonoMod(intermediaryLightningPath, moddedLightningPath, dllPaths: [Patching.PathToQuintessential]);
-        Patching.RunHookGen(moddedLightningPath);
 
         Console.WriteLine();
     }

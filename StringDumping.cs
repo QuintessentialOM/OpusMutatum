@@ -12,7 +12,7 @@ public static class StringDumping {
     public static readonly string PathToStringDumping = "StringDumping";
     public static readonly string PathToStrings = "strings";
 
-    public static readonly string[] StringDumpingDependencies = ["System.dll", "Steamworks.NET.dll"];
+    private static readonly string[] StringDumpingDependencies = ["System.dll", "Steamworks.NET.dll"];
 
     public static readonly Dictionary<Guid, string> StringsPaths = new();
     public static readonly Dictionary<Guid, Dictionary<int, string>> Strings = new();
@@ -88,10 +88,9 @@ public static class StringDumping {
 
         HashSet<string> candidateMethods = [];
         foreach (Instruction instr in instrs) {
-            if (instr.Operand is not MethodReference methodRef || methodRef.Resolve() is null)
+            if (instr.Operand is not MethodReference methodRef || methodRef.Resolve() is not { } method)
                 continue;
 
-            MethodDefinition method = methodRef.Resolve();
             // deobf method should be a static method of signature (int) => string
             if (method.IsStatic
                 && method.Parameters.Count == 1
@@ -159,6 +158,7 @@ public static class StringDumping {
         }
     }
 
+    // must be called with the non-coreified game
     public static void CreateStringDumper(AssemblyDefinition assemblyDef, string path) {
         ModuleDefinition module = assemblyDef.MainModule;
         string mvid = module.Mvid.ToString();
@@ -181,12 +181,12 @@ public static class StringDumping {
         streamWriterConstructor.Parameters.Add(new ParameterDefinition(stringType));
         streamWriterConstructor = module.ImportReference(streamWriterConstructor);
 
-        MethodReference writeLine = new("WriteLine", voidType, textWriterType) { HasThis = true };
-        writeLine.Parameters.Add(new ParameterDefinition(stringType));
-        writeLine = module.ImportReference(writeLine);
+        MethodReference textWriterWriteLine = new("WriteLine", voidType, textWriterType) { HasThis = true };
+        textWriterWriteLine.Parameters.Add(new ParameterDefinition(stringType));
+        textWriterWriteLine = module.ImportReference(textWriterWriteLine);
 
-        MethodReference dispose = new("Close", voidType, textWriterType) { HasThis = true };
-        dispose = module.ImportReference(dispose);
+        MethodReference textWriterDispose = new("Close", voidType, textWriterType) { HasThis = true };
+        textWriterDispose = module.ImportReference(textWriterDispose);
 
         Console.WriteLine("Building string dumper...");
         ILProcessor proc = module.EntryPoint.Body.GetILProcessor();
@@ -202,13 +202,22 @@ public static class StringDumping {
             proc.Append(proc.Create(OpCodes.Ldc_I4, key));
             proc.Append(proc.Create(OpCodes.Call, stringDeobfMethod));
             proc.Append(proc.Create(OpCodes.Call, concat));
-            proc.Append(proc.Create(OpCodes.Callvirt, writeLine));
+            proc.Append(proc.Create(OpCodes.Callvirt, textWriterWriteLine));
         }
 
-        proc.Append(proc.Create(OpCodes.Callvirt, dispose));
+        proc.Append(proc.Create(OpCodes.Callvirt, textWriterDispose));
         proc.Append(proc.Create(OpCodes.Ret));
 
         module.Write(path);
         Console.WriteLine($"String dumper written to {path}.");
+    }
+
+    public static void EnsureDependenciesPresent(string directory) {
+        // copy dependency dlls to the directory directly since the dumper is a framework binary :(
+        foreach (string dependency in StringDumpingDependencies) {
+            string destination = Path.Combine(directory, dependency);
+            if (!File.Exists(destination))
+                File.Copy(dependency, destination);
+        }
     }
 }

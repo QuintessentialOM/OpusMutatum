@@ -9,6 +9,9 @@ using System.Text.RegularExpressions;
 namespace OpusMutatum;
 
 public static partial class AppHosting {
+    [GeneratedRegex(@"\d+\.\d+")]
+    private static partial Regex FrameworkVersionRegex();
+
     public static void RunAssembly(string assembly, string[] args = null, string[] manualDependencies = null) {
         CreateRuntimeConfigFiles(assembly, manualDependencies);
 
@@ -120,6 +123,10 @@ public static partial class AppHosting {
         }
     }
 
-    [GeneratedRegex(@"\d+\.\d+")]
-    private static partial Regex FrameworkVersionRegex();
+    public static void RunExe(string exe)
+        => Globals.RunAndWait(Globals.OperatingSystem switch {
+            Globals.OS.Windows => $"\"{exe}\"", // TODO: i don't know how windows works
+            Globals.OS.Linux or Globals.OS.MacOS => $"mono {exe}", // TODO: i don't know how macos works
+            _ => throw new ArgumentOutOfRangeException()
+        });
 }

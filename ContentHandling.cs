@@ -6,8 +6,6 @@ public static class ContentHandling {
     private static string PathToContent = "Content";
     private static string PathToPackedContent = "PackedContent";
 
-    private static string PathToX0X = "X0X";
-
     public static void CreateContentSymlinks() {
         string vanillaPathToContent = Path.Combine(Directory.GetCurrentDirectory(), PathToContent),
             vanillaPathToPackedContent = Path.Combine(Directory.GetCurrentDirectory(), PathToPackedContent);
@@ -40,11 +38,5 @@ public static class ContentHandling {
 
         foreach (string dir in Directory.GetDirectories(src))
             CopyDirectory(dir, Path.Combine(dst, Path.GetRelativePath(src, dir)));
-    }
-
-    public static void CreateRequiredFiles() {
-        // why the fuck does the game need this ??
-        if (!Directory.Exists(PathToX0X))
-            Directory.CreateDirectory(PathToX0X);
     }
 }

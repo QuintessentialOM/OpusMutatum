@@ -81,6 +81,9 @@ public static class Globals {
         return true;
     }
 
+    public static bool TryLoadLightningExe(out AssemblyDefinition lightningExeAssemblyDef)
+        => TryLoadAssemblyDef(PathToLightningExe, out lightningExeAssemblyDef);
+
     public static bool TryLoadLightning(out AssemblyDefinition lightningAssemblyDef)
         => TryLoadAssemblyDef(Path.Combine(PathToOutput, PathToLightning), out lightningAssemblyDef);
     public static bool TryLoadIntermediaryLightning(out AssemblyDefinition intermediaryLightningAssemblyDef)

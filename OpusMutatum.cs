@@ -138,20 +138,23 @@ public static class OpusMutatum {
         try {
             switch (action) {
                 case RunAction.Setup:
+                    HandleStrings();
+
                     HandleCoreify();
                     HandleDependencies();
-                    HandleStrings();
+
                     HandleIntermediary();
+
                     HandleMerge();
+                    break;
+
+                case RunAction.Strings:
+                    HandleStrings();
                     break;
 
                 case RunAction.Coreify:
                     HandleCoreify();
                     HandleDependencies();
-                    break;
-
-                case RunAction.Strings:
-                    HandleStrings();
                     break;
 
                 case RunAction.Intermediary:
@@ -196,6 +199,26 @@ public static class OpusMutatum {
 
     #region Actions
 
+    private static void HandleStrings() {
+        if (!Globals.TryLoadLightningExe(out AssemblyDefinition lightningExe))
+            return;
+
+        Console.WriteLine("Dumping strings...");
+
+        string stringDumpingDir = Path.Combine(Globals.PathToOutput, StringDumping.PathToStringDumping);
+        string stringDumperPath = Path.Combine(stringDumpingDir, "StringDumper_Lightning.exe");
+        Directory.CreateDirectory(stringDumpingDir);
+
+        Console.WriteLine("Creating string dumper...");
+        StringDumping.CreateStringDumper(lightningExe, stringDumperPath);
+
+        Console.WriteLine("Running string dumper...");
+        StringDumping.EnsureDependenciesPresent(stringDumpingDir);
+        AppHosting.RunExe(stringDumperPath);
+
+        Console.WriteLine();
+    }
+
     private static void HandleCoreify() {
         if (!File.Exists(Globals.PathToLightningExe)) {
             Console.WriteLine("Failed to find Lightning.exe!");
@@ -212,28 +235,8 @@ public static class OpusMutatum {
         Console.WriteLine("Setting up native libraries...");
         DependencyHandling.SetupNativeLibs();
 
-        Console.WriteLine("Creating symlinks and required files...");
+        Console.WriteLine("Creating symlinks...");
         ContentHandling.CreateContentSymlinks();
-        ContentHandling.CreateRequiredFiles();
-
-        Console.WriteLine();
-    }
-
-    private static void HandleStrings() {
-        if (!Globals.TryLoadLightning(out AssemblyDefinition lightning))
-            return;
-
-        Console.WriteLine("Dumping strings...");
-
-        string stringDumpingDir = Path.Combine(Globals.PathToOutput, StringDumping.PathToStringDumping);
-        string stringDumperPath = Path.Combine(stringDumpingDir, "StringDumper_Lightning.dll");
-        Directory.CreateDirectory(stringDumpingDir);
-
-        Console.WriteLine("Creating string dumper...");
-        StringDumping.CreateStringDumper(lightning, stringDumperPath);
-
-        Console.WriteLine("Running string dumper...");
-        AppHosting.RunAssembly(stringDumperPath, manualDependencies: StringDumping.StringDumpingDependencies);
 
         Console.WriteLine();
     }
@@ -286,11 +289,12 @@ public static class OpusMutatum {
         Console.WriteLine();
     }
 
+    // fails right now due to `<Module>` getting incorectly remapped
     private static void HandleRun() {
-        Console.WriteLine("Running Lightning.dll...");
+        Console.WriteLine("Running IntermediaryLightning.dll...");
 
         DependencyHandling.SetupNativeLibLoading();
-        AppHosting.RunAssembly(Path.Combine(Globals.PathToOutput, Globals.PathToLightning));
+        AppHosting.RunAssembly(Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning));
     }
 
     #endregion

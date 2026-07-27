@@ -37,7 +37,7 @@ public static class Patching {
 
             if (!File.Exists(asmTmp))
                 throw new Exception($"MonoMod failed to create a patched assembly: exit code {returnCode}!");
-            File.Move(asmTmp, asmTo);
+            File.Move(asmTmp, asmTo, overwrite: true);
         } finally {
             File.Delete(asmTmp);
             File.Delete(Path.ChangeExtension(asmTmp, "pdb"));

@@ -16,7 +16,7 @@ public static class OpusMutatum {
         ObfToIntermediaryMappingPath,
         StringsPath,
         LightningExePath,
-        MonoModPath
+        QuintessentialPath
     }
     private enum RunAction {
         Run,
@@ -81,8 +81,8 @@ public static class OpusMutatum {
                         current = ArgumentParsingMode.StringsPath;
                     else if (arg.Equals("--lightning"))
                         current = ArgumentParsingMode.LightningExePath;
-                    else if (arg.Equals("--monomod"))
-                        current = ArgumentParsingMode.MonoModPath;
+                    else if (arg.Equals("--quintessential"))
+                        current = ArgumentParsingMode.QuintessentialPath;
                     else if (arg.Equals("--linux"))
                         Globals.OperatingSystem = Globals.OS.Linux;
                     else if (arg.Equals("--mac"))
@@ -112,8 +112,8 @@ public static class OpusMutatum {
                     current = ArgumentParsingMode.Argument;
                     break;
 
-                case ArgumentParsingMode.MonoModPath:
-                    Patching.PathToMonoMod = arg;
+                case ArgumentParsingMode.QuintessentialPath:
+                    Patching.PathToQuintessential = arg;
                     current = ArgumentParsingMode.Argument;
                     break;
 
@@ -288,12 +288,24 @@ public static class OpusMutatum {
         Console.WriteLine();
     }
 
-    // fails right now due to `<Module>` getting incorectly remapped
     private static void HandleRun() {
-        Console.WriteLine("Running IntermediaryLightning.dll...");
+        string pathToIntermediary = Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning);
+        string pathToModded = Path.Combine(Globals.PathToOutput, Globals.PathToModdedLightning);
+
+        string target = File.Exists(pathToModded)
+            ? pathToModded
+            : File.Exists(pathToIntermediary)
+                ? pathToIntermediary
+                : null;
+        if (target is null) {
+            Console.WriteLine("Failed to find target to run!");
+            return;
+        }
+
+        Console.WriteLine($"Running {Path.GetFileName(target)}...");
 
         DependencyHandling.SetupNativeLibLoading();
-        AppHosting.RunAssembly(Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning));
+        AppHosting.RunAssembly(target);
     }
 
     #endregion

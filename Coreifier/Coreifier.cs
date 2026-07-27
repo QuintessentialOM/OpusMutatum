@@ -94,6 +94,7 @@ public static class Coreifier {
         using (FrameworkModder modder = new() {
                     Module = module,
                     MissingDependencyThrow = false,
+                    LogVerboseEnabled = false,
                     PreventInlining = preventInlining
                 }) {
             modder.MapDependencies();

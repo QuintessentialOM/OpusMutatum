@@ -90,5 +90,8 @@ namespace OpusMutatum {
 
             return reference;
         }
+
+        public static Guid GetMvid(this AssemblyDefinition assembly)
+            => assembly.MainModule.Mvid;
     }
 }

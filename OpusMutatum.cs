@@ -55,7 +55,7 @@ public static class OpusMutatum {
             switch (current) {
                 case ArgumentParsingMode.Argument:
                     // check if its "run", "strings", "intermediary", merge", "coreify", "setup", "devExe", "quintDevExe"
-                    // or "--mappings", "--intermediary", "--strings", "--lightning", "--monomod", "--intermediaryPath", "--linux", "--mac", --"win"
+                    // or "--mappings", "--intermediary", "--strings", "--lightning", "--quintessential", "--intermediaryPath", "--linux", "--mac", --"win"
                     if (arg.Equals("run"))
                         action = RunAction.Run;
                     else if (arg.Equals("strings"))
@@ -250,15 +250,16 @@ public static class OpusMutatum {
 
     private static void HandleMerge() {
         string quintessentialPath = Path.Combine(Globals.PathToOutput, Patching.PathToQuintessential);
+        string quintessentialFilename = Path.GetFileName(quintessentialPath);
         if (!File.Exists(quintessentialPath)) {
-            Console.WriteLine("Failed to find Quintessential.dll, skipping merge!");
+            Console.WriteLine($"Failed to find {quintessentialFilename}, skipping merge!");
             return;
         }
 
         string intermediaryLightningPath = Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning);
         string moddedLightningPath = Path.Combine(Globals.PathToOutput, Globals.PathToModdedLightning);
 
-        Console.WriteLine("Merging Quintessential.dll...");
+        Console.WriteLine($"Merging {quintessentialFilename}...");
         Patching.RunMonoMod(intermediaryLightningPath, moddedLightningPath, dllPaths: [quintessentialPath]);
 
         Console.WriteLine();

@@ -115,13 +115,22 @@ public static class Remapping {
         private MethodMapping FindMethod(MethodReference method)
             // TODO: generic params stripped when matching method signatures due to Cecil handling generic instance method references strangely
             // probably not ideal, but maybe it's fine?
-            => FindType(method.DeclaringType)?.Methods.Where(
-                m => m.MethodNameA == method.Name
-                    && m.ReturnTypeFullNameA.Split('`')[0] == method.ReturnType.FullName.Split('`')[0]
-                    && m.ArgumentTypeFullNamesA.Count == method.Parameters.Count
-                    && m.ArgumentTypeFullNamesA.Zip(method.Parameters, (a, b) => (a, b))
-                        .All(pair => pair.a.Split('`')[0] == pair.b.ParameterType.FullName.Split('`')[0])
-            ).SingleOrNull();
+            => FindType(method.DeclaringType)?.Methods.Where(m => {
+                if (m.MethodNameA != method.Name || m.ArgumentTypeFullNamesA.Count != method.Parameters.Count || m.GenericParameters.Count != method.GenericParameters.Count)
+                    return false;
+                var paramTypes = method.Parameters.Select(p => p.ParameterType.FullName).ToList();
+                var returnType = method.ReturnType.FullName;
+                // Substitute generic names so that they compare properly - method references sometimes have !!n for the n-th generic, instead of using the method definition's generic parameter name.
+                foreach (var (from, to) in method.GenericParameters.Select(p => p.FullName).Zip(m.GenericParameters.Select(p => p.GenericNameA))) {
+                    for (int i = 0; i < paramTypes.Count; i++) {
+                        paramTypes[i] = paramTypes[i].Replace(from, to);
+                    }
+                    returnType = returnType.Replace(from, to);
+                }
+                return m.ReturnTypeFullNameA == returnType
+                    && m.ArgumentTypeFullNamesA.Zip(paramTypes, (a, b) => (a, b))
+                        .All(pair => pair.a == pair.b);
+            }).SingleOrNull();
     }
 
     private class NamedRemapper(Dictionary<string, string> mappings) : IRemapper {

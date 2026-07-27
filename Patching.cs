@@ -21,7 +21,7 @@ public static class Patching {
         }
 
         asmTo ??= asmFrom;
-        dllPaths ??= [PathToPatchingDependencies];
+        dllPaths ??= [];
 
         Console.WriteLine($"Running MonoMod for {asmFrom}...");
 
@@ -30,7 +30,8 @@ public static class Patching {
             Environment.SetEnvironmentVariable("MONOMOD_DEPDIRS", PathToPatchingDependencies);
             Environment.SetEnvironmentVariable("MONOMOD_DEPENDENCY_MISSING_THROW", "0");
 
-            int returnCode = (int) monoModAssembly.EntryPoint!.Invoke(null, [Enumerable.Repeat(asmFrom, 1).Concat(dllPaths).Append(asmTmp).ToArray()])!;
+            string[] args = Enumerable.Repeat(asmFrom, 1).Concat(dllPaths).Append(asmTmp).ToArray();
+            int returnCode = (int) monoModAssembly.EntryPoint!.Invoke(null, [args])!;
             if (returnCode != 0)
                 File.Delete(asmTmp);
 

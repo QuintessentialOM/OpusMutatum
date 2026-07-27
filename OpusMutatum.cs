@@ -16,9 +16,7 @@ public static class OpusMutatum {
         ObfToIntermediaryMappingPath,
         StringsPath,
         LightningExePath,
-        MonoModPath,
-        StringDeobfName,
-        StringDeobfIntermediaryName
+        MonoModPath
     }
     private enum RunAction {
         Run,
@@ -74,6 +72,7 @@ public static class OpusMutatum {
                         action = RunAction.DevExe;
                     else if (arg.Equals("quintDevExe"))
                         action = RunAction.QuintDevExe;
+
                     else if (arg.Equals("--mappings"))
                         current = ArgumentParsingMode.IntermediaryToNamedMappingPath;
                     else if (arg.Equals("--intermediary"))
@@ -84,10 +83,6 @@ public static class OpusMutatum {
                         current = ArgumentParsingMode.LightningExePath;
                     else if (arg.Equals("--monomod"))
                         current = ArgumentParsingMode.MonoModPath;
-                    else if (arg.Equals("--stringdeobfname"))
-                        current = ArgumentParsingMode.StringDeobfName;
-                    else if (arg.Equals("--stringdeobfintname"))
-                        current = ArgumentParsingMode.StringDeobfIntermediaryName;
                     else if (arg.Equals("--linux"))
                         Globals.OperatingSystem = Globals.OS.Linux;
                     else if (arg.Equals("--mac"))
@@ -254,13 +249,17 @@ public static class OpusMutatum {
     }
 
     private static void HandleMerge() {
+        string quintessentialPath = Path.Combine(Globals.PathToOutput, Patching.PathToQuintessential);
+        if (!File.Exists(quintessentialPath)) {
+            Console.WriteLine("Failed to find Quintessential.dll, skipping merge!");
+            return;
+        }
+
         string intermediaryLightningPath = Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning);
         string moddedLightningPath = Path.Combine(Globals.PathToOutput, Globals.PathToModdedLightning);
 
-        // run "./MonoMod.exe IntermediaryLightning.exe Quintessential.dll ModdedLightning.exe"
-        // then "./MonoMod.RuntimeDetour.HookGen.exe ModdedLightning.exe"
-        Console.WriteLine("Merging Quintessential...");
-        Patching.RunMonoMod(intermediaryLightningPath, moddedLightningPath, dllPaths: [Patching.PathToQuintessential]);
+        Console.WriteLine("Merging Quintessential.dll...");
+        Patching.RunMonoMod(intermediaryLightningPath, moddedLightningPath, dllPaths: [quintessentialPath]);
 
         Console.WriteLine();
     }

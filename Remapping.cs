@@ -330,10 +330,11 @@ public static class Remapping {
     public static void RemapToIntermediary(AssemblyDefinition obfAssemblyDef) {
         if (!StringDumping.TryLoadStrings(obfAssemblyDef, out Dictionary<int, string> strings))
             return;
+        if (!StringDumping.TryFindStringDeobfMethod(obfAssemblyDef, out MethodDefinition stringDeobfMethod))
+            return;
         if (!TryLoadObfToIntermediaryMappings(obfAssemblyDef, out Mappings mappings))
             return;
 
-        MethodReference stringDeobfMethod = StringDumping.FindStringDeobfMethod(obfAssemblyDef);
         List<(Instruction, int)> stringsToBeInlined = [];
         DoRemap(new IntermediaryRemapper(mappings), StringDumping.CollectNestedTypes(obfAssemblyDef.MainModule.Types),
             (mref, _, instr) => {

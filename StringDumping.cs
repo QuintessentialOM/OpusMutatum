@@ -14,8 +14,9 @@ public static class StringDumping {
 
     private static readonly string[] StringDumpingDependencies = ["System.dll", "Steamworks.NET.dll"];
 
-    public static readonly Dictionary<Guid, string> StringsPaths = new();
-    public static readonly Dictionary<Guid, Dictionary<int, string>> Strings = new();
+    private static readonly Dictionary<Guid, string> StringsPaths = new();
+    private static readonly Dictionary<Guid, Dictionary<int, string>> Strings = new();
+    private static readonly Dictionary<Guid, MethodDefinition> StringDeobfMethods = new();
 
     public static void LoadStringsPaths(List<string> extraStringsPaths) {
         DirectoryInfo stringsDirectory = Directory.CreateDirectory(Path.Combine(Globals.PathToOutput, PathToStringDumping, PathToStrings));
@@ -79,7 +80,15 @@ public static class StringDumping {
         return false;
     }
 
-    public static MethodDefinition FindStringDeobfMethod(AssemblyDefinition assemblyDef) {
+    public static bool TryFindStringDeobfMethod(AssemblyDefinition assemblyDef, out MethodDefinition stringDeobfMethod) {
+        stringDeobfMethod = null;
+
+        Guid mvid = assemblyDef.GetMvid();
+        if (StringDeobfMethods.TryGetValue(mvid, out stringDeobfMethod)) {
+            Console.WriteLine("Found string deobfuscation method from cache.");
+            return true;
+        }
+
         ModuleDefinition module = assemblyDef.MainModule;
         MethodDefinition mainMethod = module.EntryPoint;
 
@@ -105,17 +114,23 @@ public static class StringDumping {
             goto fail;
 
         string[] typeAndMethod = candidateMethods.Single().Split('.');
-        return module.FindMethod(typeAndMethod[0], typeAndMethod[1]);
+        StringDeobfMethods[mvid] = stringDeobfMethod = module.FindMethod(typeAndMethod[0], typeAndMethod[1]);
+        Console.WriteLine("Found string deobfuscation method.");
+        return true;
 
     fail:
-        throw new Exception("Failed to find string deobfuscation method.");
+        Console.WriteLine("Failed to find string deobfuscation method.");
+        return false;
     }
 
-    public static HashSet<int> FindStringKeys(AssemblyDefinition assemblyDef, out MethodDefinition stringDeobfMethod) {
+    public static (HashSet<int>, MethodDefinition) FindStringKeys(AssemblyDefinition assemblyDef) {
         Console.WriteLine("Finding string keys...");
 
         ModuleDefinition module = assemblyDef.MainModule;
-        stringDeobfMethod = FindStringDeobfMethod(assemblyDef);
+        if (!TryFindStringDeobfMethod(assemblyDef, out MethodDefinition stringDeobfMethod)) {
+            Console.WriteLine("Failed to find string keys.");
+            return (null, null);
+        }
 
         // get all the keys this way
         List<Instruction> refs = [];
@@ -141,7 +156,7 @@ public static class StringDumping {
 
         HashSet<int> stringKeys = refs.Select(@ref => (int) @ref.Previous!.Operand).ToHashSet();
         Console.WriteLine($"Found {stringKeys.Count} string keys.");
-        return stringKeys;
+        return (stringKeys, stringDeobfMethod);
     }
 
     public static Collection<TypeDefinition> CollectNestedTypes(Collection<TypeDefinition> topLevel) {
@@ -164,7 +179,11 @@ public static class StringDumping {
         string mvid = module.Mvid.ToString();
 
         string outputStringsPath = Path.Combine(Globals.PathToOutput, PathToStringDumping, PathToStrings, $"out_{mvid}.csv");
-        HashSet<int> stringKeys = FindStringKeys(assemblyDef, out MethodDefinition stringDeobfMethod);
+        (HashSet<int> stringKeys, MethodDefinition stringDeobfMethod) = FindStringKeys(assemblyDef);
+        if (stringKeys is null || stringDeobfMethod is null) {
+            Console.WriteLine("Failed to write string dumper.");
+            return;
+        }
 
         IMetadataScope mscorlibScope = module.AssemblyReferences.First(asmRef => asmRef.Name == "mscorlib");
         TypeReference stringType = module.TypeSystem.String;

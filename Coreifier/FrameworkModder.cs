@@ -6,8 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using MethodBody = Mono.Cecil.Cil.MethodBody;
-using MethodImplAttributes = Mono.Cecil.MethodImplAttributes;
 
 namespace Coreifier;
 
@@ -16,7 +14,6 @@ public class FrameworkModder : MonoModder {
 
     private static readonly HashSet<string> PrivateSystemLibs = ["System.Private.CoreLib"];
 
-    private const int InlineLengthLimit = 20;
     public bool PreventInlining = true;
 
     private ModuleDefinition coreifierModule;
@@ -31,7 +28,7 @@ public class FrameworkModder : MonoModder {
 
     public override void Log(string text)
         => Console.WriteLine($"[{LogID}] {text}");
-    public override void LogVerbose(string text) { } // so much log spam. disabling it with `LogVerboseEnabled = false` doesn't seem to work
+    public override void LogVerbose(string text) { } // so much log spam. disabling it with `LogVerboseEnabled = false` only works on windows?
 
     public void AddReferenceIfMissing(AssemblyName asmName) {
         if (Module.AssemblyReferences.All(asmRef => asmRef.Name != asmName.Name))
@@ -46,7 +43,7 @@ public class FrameworkModder : MonoModder {
         AddReferenceIfMissing(Assembly.GetExecutingAssembly().GetName());
 
         // we have to load our own module again every time because MonoMod messes with it. weh
-        coreifierModule ??= ModuleDefinition.ReadModule(Assembly.GetExecutingAssembly().Location) ?? throw new Exception("Failed to load Coreifier assembly");
+        coreifierModule ??= ModuleDefinition.ReadModule(Assembly.GetExecutingAssembly().Location) ?? throw new Exception("Failed to load Coreifier assembly!");
         DependencyCache[Assembly.GetExecutingAssembly().FullName!] = coreifierModule;
 
         base.MapDependencies();
@@ -81,13 +78,6 @@ public class FrameworkModder : MonoModder {
     public override void PatchRefsInMethod(MethodDefinition method) {
         base.PatchRefsInMethod(method);
 
-        // the CoreCLR JIT is much more aggressive about inlining than the .NET Framework JIT, so explicitly force it to not inline in some cases to make modding easier
-        if (PreventInlining
-            && (method.ImplAttributes & MethodImplAttributes.AggressiveInlining) == 0
-            && method.Body is { } body
-            && !CanInlineLegacyCode(body))
-            method.ImplAttributes |= MethodImplAttributes.NoInlining;
-
         // resolve uninstantiated generic typeref/def tokens inside of member methods by replacing them with generic type instances
         // CoreCLR seems to be more strict on this, because the faulty IL worked fine on .NET Framework / Mono
         if (method.DeclaringType.HasGenericParameters && method.Body is not null) {
@@ -103,22 +93,13 @@ public class FrameworkModder : MonoModder {
                     typeInst.GenericArguments.AddRange(method.DeclaringType.GenericParameters);
                     instr.Operand = typeInst;
                 } else if (instr.Operand is MemberReference memberRef and not TypeReference
-                        && memberRef.DeclaringType.SafeResolve() == method.DeclaringType
-                        && !memberRef.DeclaringType.IsGenericInstance) {
+                    && memberRef.DeclaringType.SafeResolve() == method.DeclaringType
+                    && !memberRef.DeclaringType.IsGenericInstance) {
                     GenericInstanceType typeInst = new(memberRef.DeclaringType);
                     typeInst.GenericArguments.AddRange(method.DeclaringType.GenericParameters);
                     memberRef.DeclaringType = typeInst;
                 }
             }
         }
-    }
-
-    // use the mono criteria for this, as those are known (see mono_method_check_inlining)
-    private static bool CanInlineLegacyCode(MethodBody body) {
-        // methods exceeding a certain size aren't inlined
-        return body.CodeSize < InlineLengthLimit;
-
-        // there are other checks (..ctor, profiling, method attributes, etc.), but those aren't relevant for us
-        // the method might be inlined by mono, so consider it safe to inline for the modern runtime
     }
 }

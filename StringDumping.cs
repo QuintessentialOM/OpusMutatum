@@ -43,6 +43,21 @@ public static class StringDumping {
         return Guid.TryParse(guidString, out mvid);
     }
 
+    public static Guid AsDeterministicGuid(string str) {
+
+        int hash = 17;
+        foreach (char c in str) {
+            hash = hash * 23 + c.GetHashCode();
+        }
+
+        var stringId = new byte[16];
+        for (int i = 0; i < 16; i++) {
+            stringId[i] = (byte)hash;
+            hash = hash * 29 + str[Math.Abs(hash) % str.Length].GetHashCode();
+        }
+        return new(stringId);
+    }
+
     public static bool TryLoadStrings(AssemblyDefinition assembly, out Dictionary<int, string> strings) {
         Guid mvid = assembly.GetMvid();
         if (Strings.TryGetValue(mvid, out strings)) {

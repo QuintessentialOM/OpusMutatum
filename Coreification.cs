@@ -39,7 +39,7 @@ public static class Coreification {
             return;
 
         string[] deps = DependencyHandling.GetAssemblyReferences(asmFrom).Keys.ToArray();
-        if (deps.Contains("Coreifier"))
+        if (Globals.OperatingSystem != Globals.OS.Windows && deps.Contains("Coreifier"))
             // if the assembly is already coreified, skip it
             return;
 

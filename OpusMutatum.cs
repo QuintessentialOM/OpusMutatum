@@ -9,7 +9,6 @@ public static class OpusMutatum {
     #region Program
 
     private static bool autoExit = false;
-    private static bool namedMerge = false;
 
     private enum ArgumentParsingMode {
         Argument,
@@ -19,29 +18,24 @@ public static class OpusMutatum {
         LightningExePath,
         QuintessentialPath
     }
-    private enum RunAction {
-        Run,
-        Strings,
-        Intermediary,
-        Merge,
-        Coreify,
-        Setup,
-        DevExe,
-        QuintDevExe
-    }
 
     private static void Main(string[] args) {
-        RunAction action = HandleArguments(args);
+        HandleArguments(args);
+        Globals.tasks = TaskParser.ReadTasksFromFile();
+
         HandleSetup();
 
-        Run(action);
+        foreach (var task in Globals.tasks.tasks) {
+            RunTask(task);
+        }
+        Console.WriteLine("Done.");
+        if (!autoExit) Console.ReadKey(); // keep command line open
 
         HandleCleanup();
     }
 
-    private static RunAction HandleArguments(string[] args) {
+    private static void HandleArguments(string[] args) {
         ArgumentParsingMode current = ArgumentParsingMode.Argument;
-        RunAction action = RunAction.Setup;
 
         List<string> extraStringPaths = [];
         List<string> extraIntermediaryMappingPaths = [], extraNamedMappingPaths = [];
@@ -55,26 +49,8 @@ public static class OpusMutatum {
         foreach (string arg in args) {
             switch (current) {
                 case ArgumentParsingMode.Argument:
-                    // check if its "run", "strings", "intermediary", merge", "coreify", "setup", "devExe", "quintDevExe"
-                    // or "--mappings", "--intermediary", "--strings", "--lightning", "--quintessential", "--intermediaryPath", "--linux", "--mac", --"win"
-                    if (arg.Equals("run"))
-                        action = RunAction.Run;
-                    else if (arg.Equals("strings"))
-                        action = RunAction.Strings;
-                    else if (arg.Equals("intermediary"))
-                        action = RunAction.Intermediary;
-                    else if (arg.Equals("merge"))
-                        action = RunAction.Merge;
-                    else if (arg.Equals("coreify"))
-                        action = RunAction.Coreify;
-                    else if (arg.Equals("setup"))
-                        action = RunAction.Setup;
-                    else if (arg.Equals("devExe"))
-                        action = RunAction.DevExe;
-                    else if (arg.Equals("quintDevExe"))
-                        action = RunAction.QuintDevExe;
-
-                    else if (arg.Equals("--mappings"))
+                    // check if its "--mappings", "--intermediary", "--strings", "--lightning", "--quintessential", "--intermediaryPath", "--linux", "--mac", --"win"
+                    if (arg.Equals("--mappings"))
                         current = ArgumentParsingMode.IntermediaryToNamedMappingPath;
                     else if (arg.Equals("--intermediary"))
                         current = ArgumentParsingMode.ObfToIntermediaryMappingPath;
@@ -92,8 +68,6 @@ public static class OpusMutatum {
                         Globals.OperatingSystem = Globals.OS.Windows;
                     else if (arg.Equals("--autoExit"))
                         autoExit = true;
-                    else if (arg.Equals("--namedMerge"))
-                        namedMerge = true;
                     break;
 
                 case ArgumentParsingMode.LightningExePath:
@@ -128,190 +102,52 @@ public static class OpusMutatum {
 
         StringDumping.LoadStringsPaths(extraStringPaths);
         Remapping.LoadMappingsPaths(extraIntermediaryMappingPaths, extraNamedMappingPaths);
-
-        return action;
     }
 
-    private static void Run(RunAction action) {
+    private static void RunTask(Task task) {
         try {
-            switch (action) {
-                case RunAction.Setup:
-                    HandleStrings();
-
-                    HandleCoreify();
-                    HandleDependencies();
-
-                    HandleIntermediary();
-                    if (namedMerge) HandleQuintDevExe();
-
-                    HandleMerge();
+            switch (task.command) {
+                case Command.Strings:
+                    Tasks.HandleStrings(task.args);
                     break;
-
-                case RunAction.Strings:
-                    HandleStrings();
+                case Command.Intermediary:
+                    Tasks.HandleIntermediarySteps(task.args);
                     break;
-
-                case RunAction.Coreify:
-                    HandleCoreify();
-                    HandleDependencies();
+                case Command.Merge:
+                    Tasks.HandleMerge(task.args);
                     break;
-
-                case RunAction.Intermediary:
-                    HandleIntermediary();
+                case Command.Copy:
+                    Tasks.HandleCopy(task.args);
                     break;
-
-                case RunAction.Merge:
-                    HandleMerge();
+                case Command.NewMod:
+                    Tasks.HandleNewMod(task.args);
                     break;
-
-                case RunAction.QuintDevExe:
-                    HandleQuintDevExe();
+                case Command.Run:
+                    Tasks.HandleRun(task.args);
                     break;
-                case RunAction.DevExe:
-                    HandleDevExe();
-                    break;
-
-                case RunAction.Run:
                 default:
-                    HandleRun();
                     break;
             }
+            Console.WriteLine();
         } catch (Exception e) {
             Console.WriteLine("Error executing task:");
             Console.WriteLine(e.ToString());
         }
-
-        Console.WriteLine("Done.");
-        // keep command line open
-        if (!autoExit) Console.ReadKey();
     }
 
     private static void HandleSetup() {
+        Globals.PathToOutput = Globals.tasks.gameDir;
+        Globals.PathToTemporaryOutput = Path.Combine(Globals.tasks.gameDir, "temp");
+        Remapping.PathToMappings = Globals.tasks.mappingDir;
+        //tasks.modsDir
+
+        autoExit = Globals.tasks.autoExit || autoExit;
+
         Directory.CreateDirectory(Globals.PathToOutput);
         Directory.CreateDirectory(Globals.PathToTemporaryOutput);
     }
     private static void HandleCleanup() {
         Directory.Delete(Globals.PathToTemporaryOutput, recursive: true);
-    }
-
-    #endregion
-
-    #region Actions
-
-    private static void HandleStrings() {
-        if (!Globals.TryLoadLightningExe(out AssemblyDefinition lightningExe))
-            return;
-
-        Console.WriteLine("Dumping strings...");
-
-        string stringDumpingDir = Path.Combine(Globals.PathToOutput, StringDumping.PathToStringDumping);
-        string stringDumperPath = Path.Combine(stringDumpingDir, "StringDumper_Lightning.exe");
-        Directory.CreateDirectory(stringDumpingDir);
-
-        Console.WriteLine("Creating string dumper...");
-        StringDumping.CreateStringDumper(lightningExe, stringDumperPath);
-
-        Console.WriteLine("Running string dumper...");
-        StringDumping.EnsureDependenciesPresent(stringDumpingDir);
-        AppHosting.RunExe(stringDumperPath);
-
-        Console.WriteLine();
-    }
-
-    private static void HandleCoreify() {
-        if (!File.Exists(Globals.PathToLightningExe)) {
-            Console.WriteLine("Failed to find Lightning.exe!");
-            return;
-        }
-
-        Console.WriteLine("Coreifying Lightning.exe...");
-        Coreification.Coreify(Globals.PathToLightningExe, Path.Combine(Globals.PathToOutput, Globals.PathToLightning));
-
-        Console.WriteLine();
-    }
-
-    private static void HandleDependencies() {
-        Console.WriteLine("Setting up native libraries...");
-        DependencyHandling.SetupNativeLibs();
-
-        Console.WriteLine("Creating symlinks...");
-        ContentHandling.CreateContentSymlinks();
-
-        Console.WriteLine();
-    }
-
-    private static void HandleIntermediary() {
-        // TODO: MonoMod relinking?
-        if (!Globals.TryLoadLightning(out AssemblyDefinition lightning))
-            return;
-
-        Console.WriteLine("Generating intermediary assembly...");
-        Remapping.RemapToIntermediary(lightning);
-
-        lightning.Write(Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning));
-        Console.WriteLine();
-    }
-
-    private static void HandleMerge() {
-        string quintessentialPath = Path.Combine(Globals.PathToOutput, Patching.PathToQuintessential);
-        string quintessentialFilename = Path.GetFileName(quintessentialPath);
-        if (!File.Exists(quintessentialPath)) {
-            Console.WriteLine($"Failed to find {quintessentialFilename}, skipping merge!");
-            return;
-        }
-
-        string intermediaryLightningPath = Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning);
-        string moddedLightningPath = Path.Combine(Globals.PathToOutput, Globals.PathToModdedLightning);
-        string quintDevLightningPath = Path.Combine(Globals.PathToOutput,Globals.PathToQuintDevLightning);
-
-        Console.WriteLine($"Merging {quintessentialFilename}...");
-        Patching.RunMonoMod(namedMerge ? quintDevLightningPath : intermediaryLightningPath, moddedLightningPath, dllPaths: [quintessentialPath]);
-
-        Console.WriteLine();
-    }
-
-    private static void HandleDevExe() {
-        // take ModdedLightning.exe, remap to named
-        if (!Globals.TryLoadModdedLightning(out AssemblyDefinition moddedLightning))
-            return;
-
-        Console.WriteLine("Generating development assembly...");
-        Remapping.RemapToNamed(moddedLightning);
-
-        moddedLightning.Write(Path.Combine(Globals.PathToOutput, "DevLightning.dll"));
-        Console.WriteLine();
-    }
-
-    private static void HandleQuintDevExe() {
-        // take IntermediaryLightning.exe, remap to named (no merged quintessential)
-        if (!Globals.TryLoadIntermediaryLightning(out AssemblyDefinition intermediaryLightning))
-            return;
-
-        Console.WriteLine("Generating Quintessential development assembly...");
-        Remapping.RemapToNamed(intermediaryLightning);
-
-        intermediaryLightning.Write(Path.Combine(Globals.PathToOutput, "QuintDevLightning.dll"));
-        Console.WriteLine();
-    }
-
-    private static void HandleRun() {
-        string pathToIntermediary = Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning);
-        string pathToModded = Path.Combine(Globals.PathToOutput, Globals.PathToModdedLightning);
-
-        string target = File.Exists(pathToModded)
-            ? pathToModded
-            : File.Exists(pathToIntermediary)
-                ? pathToIntermediary
-                : null;
-        if (target is null) {
-            Console.WriteLine("Failed to find target to run!");
-            return;
-        }
-
-        Console.WriteLine($"Running {Path.GetFileName(target)}...");
-
-        DependencyHandling.SetupNativeLibLoading();
-        AppHosting.RunAssembly(target);
     }
 
     #endregion

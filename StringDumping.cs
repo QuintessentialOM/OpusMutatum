@@ -23,39 +23,12 @@ public static class StringDumping {
         string[] stringsPaths = stringsDirectory.GetFiles().Select(file => file.FullName).Concat(extraStringsPaths).ToArray();
 
         foreach (string path in stringsPaths) {
-            if (!TryParseMvidFromPath(path, out Guid mvid))
+            if (!GuidUtils.TryParseMvidFromPath(path, out Guid mvid))
                 continue;
 
             if (!StringsPaths.TryAdd(mvid, path))
                 Console.WriteLine($"Encountered duplicate strings file {path} for MVID `{mvid}`, skipping...");
         }
-    }
-
-    public static bool TryParseMvidFromPath(string path, out Guid mvid) {
-        mvid = Guid.Empty;
-
-        string filename = Path.GetFileNameWithoutExtension(path);
-        int index = filename.LastIndexOf('_');
-        if (index < 0)
-            return false;
-
-        string guidString = filename[(index + 1)..];
-        return Guid.TryParse(guidString, out mvid);
-    }
-
-    public static Guid AsDeterministicGuid(string str) {
-
-        int hash = 17;
-        foreach (char c in str) {
-            hash = hash * 23 + c.GetHashCode();
-        }
-
-        var stringId = new byte[16];
-        for (int i = 0; i < 16; i++) {
-            stringId[i] = (byte)hash;
-            hash = hash * 29 + str[Math.Abs(hash) % str.Length].GetHashCode();
-        }
-        return new(stringId);
     }
 
     public static bool TryLoadStrings(AssemblyDefinition assembly, out Dictionary<int, string> strings) {

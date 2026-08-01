@@ -1,3 +1,4 @@
+using Mono.Cecil;
 using System;
 using System.IO;
 using System.Linq;
@@ -14,7 +15,7 @@ public static class Patching {
     private static bool TryLoadMonoMod(out Assembly monoModAssembly)
         => Globals.TryLoadAssembly(PathToMonoMod, out monoModAssembly);
 
-    public static void RunMonoMod(string asmFrom, string asmTo = null, string[] dllPaths = null) {
+    public static void RunMonoMod(string asmFrom, string asmTo = null, string[] dllPaths = null, bool mergeDllGuids = false) {
         if (!TryLoadMonoMod(out Assembly monoModAssembly)) {
             Console.WriteLine("Unable to load MonoMod, skipping patching!");
             return;
@@ -37,7 +38,15 @@ public static class Patching {
 
             if (!File.Exists(asmTmp))
                 throw new Exception($"MonoMod failed to create a patched assembly: exit code {returnCode}!");
-            File.Move(asmTmp, asmTo, overwrite: true);
+            if (mergeDllGuids) {
+                string asmTmp2 = Path.Combine(Globals.PathToTemporaryOutput, "2_" + Path.GetFileName(asmTo));
+                using var def = AssemblyDefinition.ReadAssembly(asmTmp);
+                string[] assembliesMerged = dllPaths.Append(asmFrom).ToArray();
+                def.MainModule.Mvid = GuidUtils.MergeAssemblyGuids(assembliesMerged);
+                def.Write(asmTmp2);
+                File.Move(asmTmp2, asmTo, overwrite: true);
+            } else
+                File.Move(asmTmp, asmTo, overwrite: true);
         } finally {
             File.Delete(asmTmp);
             File.Delete(Path.ChangeExtension(asmTmp, "pdb"));

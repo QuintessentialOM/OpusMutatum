@@ -2,7 +2,6 @@
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace OpusMutatum;
 public class RunDebugger {
@@ -12,14 +11,21 @@ public class RunDebugger {
 
     public void HandleRuningProcess(Process p) {
 
-
         AsyncStreamRedirector gameLog = null;
         if (readLogs && File.Exists(Path.Combine(Globals.PathToOutput, "log.txt"))) {
-            System.Threading.Thread.Sleep(1000); // Sleepnig to avoid crashing the game by reading log.txt before the game opens the file
-            FileStream logStream = new FileStream(Path.Combine(Globals.PathToOutput, "log.txt"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            if (logStream != null && logStream.CanRead) {
-                Console.WriteLine(" -#- Reading Logs.");
-                gameLog = new AsyncStreamRedirector(logStream, Console.OpenStandardOutput(), false);
+            Thread.Sleep(1000); // Sleepnig to avoid crashing the game by reading log.txt before the game opens the file
+            try {
+                FileStream logStream = new FileStream(Path.Combine(Globals.PathToOutput, "log.txt"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                if (logStream != null && logStream.CanRead) {
+                    Console.WriteLine();
+                    Console.WriteLine("Reading Logs:");
+                    gameLog = new AsyncStreamRedirector(logStream, Console.OpenStandardOutput(), false);
+                }
+                
+            } catch (Exception e) {
+                Console.WriteLine();
+                Console.WriteLine("Failed to read logs:");
+                Console.WriteLine(e.ToString());
             }
         }
     }

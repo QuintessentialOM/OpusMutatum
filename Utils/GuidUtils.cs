@@ -43,6 +43,7 @@ internal class GuidUtils {
                 guidBytes.Add(asmDef.GetMvid().ToByteArray());
             }
         }
+        if (guidBytes.Count == 1) return new(guidBytes[0]);
 
         var idBytes = new byte[16];
         for (int i = 0; i < 16; i++) {

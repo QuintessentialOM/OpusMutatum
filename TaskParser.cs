@@ -8,7 +8,7 @@ namespace OpusMutatum;
 public static class TaskParser {
 
     static readonly string tasksFileName = "tasks.txt";
-    static readonly string exampleFileData = "Tasks:\r\n* strings --onlyOnChange\r\n* intermediary --onlyOnChange\r\n* merge --onlyOnChange\r\n* run\r\n\r\nGameDir:\r\n  modded\r\nModsDir:\r\n  modded/Mods\r\nMappingsDir:\r\n  modded/Mappings";
+    static readonly string exampleFileData = "Tasks:\r\n* strings --onlyOnChange\r\n* intermediary --onlyOnChange\r\n* merge --onlyOnChange\r\n* run --readLogs\r\n\r\nAutoExit:\r\n  true";
     public static MutatumTasks ReadTasksFromFile() {
 
         string tasksFilePath = Path.Combine(Directory.GetCurrentDirectory(), tasksFileName);

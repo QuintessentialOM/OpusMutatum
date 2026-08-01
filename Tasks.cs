@@ -36,7 +36,7 @@ public static class Tasks {
 
         Console.WriteLine("Running string dumper...");
         StringDumping.EnsureDependenciesPresent(stringDumpingDir);
-        AppHosting.RunExe(stringDumperPath);
+        StringDumping.RunStringDumperAndAddPath(stringDumperPath);
 
         Console.WriteLine();
     }
@@ -91,12 +91,12 @@ public static class Tasks {
 
     private static void HandleIntermediary(bool onlyOnChange) {
         // TODO: MonoMod relinking?
-        if (!Globals.TryLoadLightning(out AssemblyDefinition lightning))
-            return;
         if (onlyOnChange && GuidUtils.SameGuidAssemblies(Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning), Path.Combine(Globals.PathToOutput, Globals.PathToLightning))) {
             Console.WriteLine("Found cache, skipping intermediary assembly generation.");
             return;
         }
+        if (!Globals.TryLoadLightning(out AssemblyDefinition lightning))
+            return;
 
         Console.WriteLine("Generating intermediary assembly...");
         Remapping.RemapToIntermediary(lightning);
@@ -159,12 +159,12 @@ public static class Tasks {
 
     public static void HandleQuintDevExe(bool onlyOnChange) {
         // take IntermediaryLightning.exe, remap to named (no merged quintessential)
-        if (!Globals.TryLoadIntermediaryLightning(out AssemblyDefinition intermediaryLightning))
-            return;
         if (onlyOnChange && GuidUtils.SameGuidAssemblies(Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning), Path.Combine(Globals.PathToOutput, Globals.PathToQuintDevLightning))) {
             Console.WriteLine("Found cache, skipping Quintessential development assembly generation.");
             return;
         }
+        if (!Globals.TryLoadIntermediaryLightning(out AssemblyDefinition intermediaryLightning))
+            return;
 
         Console.WriteLine("Generating Quintessential development assembly...");
         Remapping.RemapToNamed(intermediaryLightning);

@@ -31,6 +31,14 @@ public static class StringDumping {
         }
     }
 
+    public static void RunStringDumperAndAddPath(string stringDumperPath) {
+        AppHosting.RunExe(stringDumperPath);
+
+        var def = AssemblyDefinition.ReadAssembly(stringDumperPath);
+        Guid mvid = def.GetMvid();
+        StringsPaths[mvid] = Path.Combine(Globals.PathToOutput, PathToStringDumping, PathToStrings, "out_" + mvid + ".csv");
+    }
+
     public static bool TryLoadStrings(AssemblyDefinition assembly, out Dictionary<int, string> strings) {
         Guid mvid = assembly.GetMvid();
         if (Strings.TryGetValue(mvid, out strings)) {

@@ -154,7 +154,7 @@ public static partial class DependencyHandling {
 
         switch (Globals.OperatingSystem) {
             case Globals.OS.Windows:
-                SetDllDirectory(Path.Combine(baseNativeLibPath,
+                SetDllDirectoryA(Path.Combine(baseNativeLibPath,
                     Environment.Is64BitProcess ? Windows64BitNativeLibPath : Windows32BitNativeLibPath));
                 break;
 
@@ -175,7 +175,7 @@ public static partial class DependencyHandling {
     [SupportedOSPlatform("windows")]
     [LibraryImport("kernel32.dll", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool SetDllDirectory(string lpPathName);
+    private static partial bool SetDllDirectoryA(string lpPathName);
 
     private static void EnsureLibPathEnvVarSet(string envVar, string libPath) {
         libPath = Path.GetFullPath(libPath);

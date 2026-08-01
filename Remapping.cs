@@ -115,7 +115,7 @@ public static class Remapping {
         private MethodMapping FindMethod(MethodReference method)
             // TODO: generic params stripped when matching method signatures due to Cecil handling generic instance method references strangely
             // probably not ideal, but maybe it's fine?
-            => FindType(method.DeclaringType)?.Methods.Where(m => {
+                        => FindType(method.DeclaringType)?.Methods.Where(m => {
                 if (m.MethodNameA != method.Name || m.ArgumentTypeFullNamesA.Count != method.Parameters.Count || m.GenericParameters.Count != method.GenericParameters.Count)
                     return false;
                 var paramTypes = method.Parameters.Select(p => p.ParameterType.FullName).ToList();
@@ -261,8 +261,8 @@ public static class Remapping {
 
     private static void AddMappingsFiles(List<string> mappingsPaths, Dictionary<Guid, string> mappings) {
         foreach (string path in mappingsPaths) {
-            if (!StringDumping.TryParseMvidFromPath(path, out Guid mvid))
-                continue;
+            if (!StringDumping.TryParseMvidFromPath(path, out Guid mvid)) 
+                mvid = StringDumping.AsDeterministicGuid(Path.GetFileNameWithoutExtension(path));
 
             if (!mappings.TryAdd(mvid, path))
                 Console.WriteLine($"Encountered duplicate mappings file {path} for MVID `{mvid}`, skipping...");
@@ -308,32 +308,37 @@ public static class Remapping {
 
         mappings = new Dictionary<string, string>();
 
-        if (!IntermediaryToNamedMappingsPaths.TryGetValue(mvid, out string path) || !File.Exists(path))
-            goto fail;
+        foreach (var pair in IntermediaryToNamedMappingsPaths) {
+            string path = pair.Value;
+            if (File.Exists(path)) {
+                string[] lines = File.ReadAllLines(path);
+                if (lines.Length > 1 && lines[0].StartsWith("Mapping version: ")) {
 
-        string[] lines = File.ReadAllLines(path);
-        if (lines.Length <= 1 || !lines[0].StartsWith("Mapping version: "))
-            goto fail;
+                    for (int i = 1; i < lines.Length; i++) {
+                        string line = lines[i];
 
-        for (int i = 1; i < lines.Length; i++) {
-            string line = lines[i];
+                        if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
+                            continue;
+                        if (!line.Contains(',')) {
+                            Console.WriteLine($"Missing ',' at {line}");
+                        }
 
-            if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
-                continue;
-            if (!line.Contains(','))
-                goto fail;
+                        string[] parts = line.Split(',');
+                        mappings[parts[0]] = parts[1];
+                    }
 
-            string[] parts = line.Split(',');
-            mappings[parts[0]] = parts[1];
+                    Console.WriteLine($"Found valid named mappings: {Path.GetFileName(path)}");
+                }
+            }
         }
+
         IntermediaryToNamedMappings[mvid] = mappings;
+        if (mappings.Count == 0) {
+            Console.WriteLine("Failed to find valid named mappings!");
+            return false;
+        }
 
-        Console.WriteLine($"Found valid named mappings: {Path.GetFileName(path)}");
         return true;
-
-    fail:
-        Console.WriteLine("Failed to find valid named mappings!");
-        return false;
     }
 
     public static void RemapToIntermediary(AssemblyDefinition obfAssemblyDef) {

@@ -9,6 +9,7 @@ public static class OpusMutatum {
     #region Program
 
     private static bool autoExit = false;
+    private static bool namedMerge = false;
 
     private enum ArgumentParsingMode {
         Argument,
@@ -91,6 +92,8 @@ public static class OpusMutatum {
                         Globals.OperatingSystem = Globals.OS.Windows;
                     else if (arg.Equals("--autoExit"))
                         autoExit = true;
+                    else if (arg.Equals("--namedMerge"))
+                        namedMerge = true;
                     break;
 
                 case ArgumentParsingMode.LightningExePath:
@@ -139,6 +142,7 @@ public static class OpusMutatum {
                     HandleDependencies();
 
                     HandleIntermediary();
+                    if (namedMerge) HandleQuintDevExe();
 
                     HandleMerge();
                     break;
@@ -258,9 +262,10 @@ public static class OpusMutatum {
 
         string intermediaryLightningPath = Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning);
         string moddedLightningPath = Path.Combine(Globals.PathToOutput, Globals.PathToModdedLightning);
+        string quintDevLightningPath = Path.Combine(Globals.PathToOutput,Globals.PathToQuintDevLightning);
 
         Console.WriteLine($"Merging {quintessentialFilename}...");
-        Patching.RunMonoMod(intermediaryLightningPath, moddedLightningPath, dllPaths: [quintessentialPath]);
+        Patching.RunMonoMod(namedMerge ? quintDevLightningPath : intermediaryLightningPath, moddedLightningPath, dllPaths: [quintessentialPath]);
 
         Console.WriteLine();
     }

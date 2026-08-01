@@ -24,6 +24,7 @@ public static class Globals {
     public static string PathToLightning = "Lightning.dll";
     public static string PathToIntermediaryLightning = "IntermediaryLightning.dll";
     public static string PathToModdedLightning = "ModdedLightning.dll";
+    public static string PathToQuintDevLightning = "QuintDevLightning.dll";
 
     private static readonly Dictionary<string, Assembly> CachedAssemblies = new();
     private static readonly Dictionary<string, AssemblyDefinition> CachedAssemblyDefs = new();

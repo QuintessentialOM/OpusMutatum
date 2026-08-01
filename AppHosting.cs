@@ -12,13 +12,13 @@ public static partial class AppHosting {
     [GeneratedRegex(@"\d+\.\d+")]
     private static partial Regex FrameworkVersionRegex();
 
-    public static void RunAssembly(string assembly, string[] args = null, string[] manualDependencies = null, RunDebugger debugData = null) {
+    public static void RunAssembly(string assembly, string[] args = null, string[] manualDependencies = null, RunDebugger debugger = null) {
         CreateRuntimeConfigFiles(assembly, manualDependencies);
 
         string argsString = args is not null
             ? $"{assembly} {string.Join(' ', args)}"
             : assembly;
-        Globals.RunAndWait($"dotnet {argsString}", debugData);
+        Globals.RunAndWait($"dotnet {argsString}", debugger);
     }
 
     public static void CreateRuntimeConfigFiles(string assembly, string[] manualDependencies = null) {

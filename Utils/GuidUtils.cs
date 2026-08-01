@@ -35,7 +35,7 @@ internal class GuidUtils {
         return new(stringId);
     }
 
-    public static Guid MergeAssemblyGuids(string[] paths) {
+    public static Guid MergeAssemblyMvids(string[] paths) {
         List<byte[]> guidBytes = [];
         foreach (var path in paths) {
             if (File.Exists(path)) {
@@ -54,7 +54,7 @@ internal class GuidUtils {
         }
         return new(idBytes);
     }
-    public static bool SameGuidAssemblies(string path1, string path2) {
+    public static bool SameMvidAssemblies(string path1, string path2) {
         // Skipp the use of caching because compared assemblies might change.
 
         string filename1 = Path.GetFileName(path1);
@@ -69,7 +69,7 @@ internal class GuidUtils {
         return assemblyDef1.GetMvid() == assemblyDef2.GetMvid();
     }
 
-    public static bool SameGuidAssemblies(string[] paths, string path) {
+    public static bool SameMvidAssemblies(string[] paths, string path) {
         // Skipp the use of caching because compared assemblies might change.
 
         string filename = Path.GetFileName(path);
@@ -79,6 +79,6 @@ internal class GuidUtils {
 
         AssemblyDefinition assemblyDef = AssemblyDefinition.ReadAssembly(path);
 
-        return assemblyDef.GetMvid() == MergeAssemblyGuids(paths);
+        return assemblyDef.GetMvid() == MergeAssemblyMvids(paths);
     }
 }

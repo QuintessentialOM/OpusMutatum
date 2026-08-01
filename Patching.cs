@@ -15,7 +15,7 @@ public static class Patching {
     private static bool TryLoadMonoMod(out Assembly monoModAssembly)
         => Globals.TryLoadAssembly(PathToMonoMod, out monoModAssembly);
 
-    public static void RunMonoMod(string asmFrom, string asmTo = null, string[] dllPaths = null, bool mergeDllGuids = false) {
+    public static void RunMonoMod(string asmFrom, string asmTo = null, string[] dllPaths = null, bool mergeDllMvids = false) {
         if (!TryLoadMonoMod(out Assembly monoModAssembly)) {
             Console.WriteLine("Unable to load MonoMod, skipping patching!");
             return;
@@ -38,11 +38,11 @@ public static class Patching {
 
             if (!File.Exists(asmTmp))
                 throw new Exception($"MonoMod failed to create a patched assembly: exit code {returnCode}!");
-            if (mergeDllGuids) {
+            if (mergeDllMvids) {
                 string asmTmp2 = Path.Combine(Globals.PathToTemporaryOutput, "2_" + Path.GetFileName(asmTo));
                 using var def = AssemblyDefinition.ReadAssembly(asmTmp);
                 string[] assembliesMerged = dllPaths.Append(asmFrom).ToArray();
-                def.MainModule.Mvid = GuidUtils.MergeAssemblyGuids(assembliesMerged);
+                def.MainModule.Mvid = GuidUtils.MergeAssemblyMvids(assembliesMerged);
                 def.Write(asmTmp2);
                 File.Move(asmTmp2, asmTo, overwrite: true);
             } else

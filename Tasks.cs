@@ -23,7 +23,7 @@ public static class Tasks {
         string stringDumperPath = Path.Combine(stringDumpingDir, "StringDumper_Lightning.exe");
         Directory.CreateDirectory(stringDumpingDir);
 
-        if (onlyOnChange && GuidUtils.SameGuidAssemblies(Globals.PathToLightningExe, stringDumperPath)) {
+        if (onlyOnChange && GuidUtils.SameMvidAssemblies(Globals.PathToLightningExe, stringDumperPath)) {
             Console.WriteLine("Found cache, skipping string dumping.");
             return;
         }
@@ -67,7 +67,7 @@ public static class Tasks {
             Console.WriteLine("Failed to find Lightning.exe!");
             return;
         }
-        if (onlyOnChange && GuidUtils.SameGuidAssemblies(Globals.PathToLightningExe, Path.Combine(Globals.PathToOutput, Globals.PathToLightning))) {
+        if (onlyOnChange && GuidUtils.SameMvidAssemblies(Globals.PathToLightningExe, Path.Combine(Globals.PathToOutput, Globals.PathToLightning))) {
             Console.WriteLine("Found cache, skipping coreification.");
             return;
         }
@@ -91,7 +91,7 @@ public static class Tasks {
 
     private static void HandleIntermediary(bool onlyOnChange) {
         // TODO: MonoMod relinking?
-        if (onlyOnChange && GuidUtils.SameGuidAssemblies(Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning), Path.Combine(Globals.PathToOutput, Globals.PathToLightning))) {
+        if (onlyOnChange && GuidUtils.SameMvidAssemblies(Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning), Path.Combine(Globals.PathToOutput, Globals.PathToLightning))) {
             Console.WriteLine("Found cache, skipping intermediary assembly generation.");
             return;
         }
@@ -134,7 +134,7 @@ public static class Tasks {
             return;
         }
         string[] assembliesMerged = [quintessentialPath, asNamed ? quintDevLightningPath : intermediaryLightningPath];
-        if (onlyOnChange && GuidUtils.SameGuidAssemblies(assembliesMerged, moddedLightningPath)) {
+        if (onlyOnChange && GuidUtils.SameMvidAssemblies(assembliesMerged, moddedLightningPath)) {
             Console.WriteLine("Found cache, skipping modded assembly generation.");
             return;
         }
@@ -159,7 +159,7 @@ public static class Tasks {
 
     public static void HandleQuintDevExe(bool onlyOnChange) {
         // take IntermediaryLightning.exe, remap to named (no merged quintessential)
-        if (onlyOnChange && GuidUtils.SameGuidAssemblies(Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning), Path.Combine(Globals.PathToOutput, Globals.PathToQuintDevLightning))) {
+        if (onlyOnChange && GuidUtils.SameMvidAssemblies(Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning), Path.Combine(Globals.PathToOutput, Globals.PathToQuintDevLightning))) {
             Console.WriteLine("Found cache, skipping Quintessential development assembly generation.");
             return;
         }
@@ -175,21 +175,21 @@ public static class Tasks {
 
     public static void HandleRun(string[] args) {
         bool inputArgs = false;
-        RunDebugger gameDebugData = new();
+        RunDebugger gameDebugger = new();
         foreach (var item in args) {
             if (inputArgs) {
                 inputArgs = false;
-                gameDebugData.runArgs = item.Trim(['"']).Split([' ']);
+                gameDebugger.runArgs = item.Trim(['"']).Split([' ']);
             } else {
                 switch (item) {
                     case "-args":
                         inputArgs = true;
                         break;
                     case "--attachDebugger":
-                        gameDebugData.attachDebugger = true;
+                        gameDebugger.attachDebugger = true;
                         break;
                     case "--readLogs":
-                        gameDebugData.readLogs = true;
+                        gameDebugger.readLogs = true;
                         break;
                     default:
                         Console.WriteLine($"Invalid Argument '{item}' for 'run' task.");
@@ -214,7 +214,7 @@ public static class Tasks {
         Console.WriteLine($"Running {Path.GetFileName(target)}...");
 
         DependencyHandling.SetupNativeLibLoading();
-        AppHosting.RunAssembly(target, gameDebugData.runArgs, debugData: gameDebugData);
+        AppHosting.RunAssembly(target, gameDebugger.runArgs, debugger: gameDebugger);
     }
 
     public static void HandleCopy(string[] args) {

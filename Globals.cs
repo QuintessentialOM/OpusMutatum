@@ -94,7 +94,7 @@ public static class Globals {
     public static bool TryLoadModdedLightning(out AssemblyDefinition moddedLightningAssemblyDef)
         => TryLoadAssemblyDef(Path.Combine(PathToOutput, PathToModdedLightning), out moddedLightningAssemblyDef);
 
-    public static void RunAndWait(string command, RunDebugger debugData = null) {
+    public static void RunAndWait(string command, RunDebugger debugger = null) {
         Console.WriteLine($"Running `{command}`...");
 
         ProcessStartInfo startInfo = OperatingSystem switch {
@@ -115,7 +115,7 @@ public static class Globals {
 
         Process process = new() { StartInfo = startInfo };
         process.Start();
-        debugData?.HandleRuningProcess(process);
+        debugger?.HandleRuningProcess(process);
         process.WaitForExit();
 
         Console.WriteLine($"Process exited with code {process.ExitCode}.");

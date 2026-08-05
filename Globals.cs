@@ -16,8 +16,8 @@ public static class Globals {
     };
     public static OS OperatingSystem = OS.Windows;
 
-    public static readonly string PathToOutput = "modded";
-    public static readonly string PathToTemporaryOutput = "modded/temp";
+    public static string PathToOutput = "modded";
+    public static string PathToTemporaryOutput = "modded/temp";
 
     public static string PathToLightningExe = "Lightning.exe";
 
@@ -25,6 +25,8 @@ public static class Globals {
     public static string PathToIntermediaryLightning = "IntermediaryLightning.dll";
     public static string PathToModdedLightning = "ModdedLightning.dll";
     public static string PathToQuintDevLightning = "QuintDevLightning.dll";
+
+    public static MutatumTasks tasks = null;
 
     private static readonly Dictionary<string, Assembly> CachedAssemblies = new();
     private static readonly Dictionary<string, AssemblyDefinition> CachedAssemblyDefs = new();
@@ -81,7 +83,7 @@ public static class Globals {
         Console.WriteLine($"Found {filename}: {assemblyDef!.FullName}");
         return true;
     }
-
+    
     public static bool TryLoadLightningExe(out AssemblyDefinition lightningExeAssemblyDef)
         => TryLoadAssemblyDef(PathToLightningExe, out lightningExeAssemblyDef);
 
@@ -92,7 +94,7 @@ public static class Globals {
     public static bool TryLoadModdedLightning(out AssemblyDefinition moddedLightningAssemblyDef)
         => TryLoadAssemblyDef(Path.Combine(PathToOutput, PathToModdedLightning), out moddedLightningAssemblyDef);
 
-    public static void RunAndWait(string command) {
+    public static void RunAndWait(string command, RunDebugger debugger = null) {
         Console.WriteLine($"Running `{command}`...");
 
         ProcessStartInfo startInfo = OperatingSystem switch {
@@ -113,6 +115,7 @@ public static class Globals {
 
         Process process = new() { StartInfo = startInfo };
         process.Start();
+        debugger?.HandleRuningProcess(process);
         process.WaitForExit();
 
         Console.WriteLine($"Process exited with code {process.ExitCode}.");

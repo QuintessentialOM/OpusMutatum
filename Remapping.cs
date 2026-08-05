@@ -235,7 +235,7 @@ public static class Remapping {
 
     #region Remapping
 
-    public static string PathToMappings = "Mappings";
+    public static string PathToMappings = "modded/Mappings";
     public static string PathToIntermediary = "intermediary";
     public static string PathToNamed = "named";
 
@@ -243,9 +243,9 @@ public static class Remapping {
     private static readonly Dictionary<Guid, string> IntermediaryToNamedMappingsPaths = new();
 
     public static void LoadMappingsPaths(List<string> extraIntermediaryMappingsPaths = null, List<string> extraNamedMappingsPaths = null) {
-        DirectoryInfo mappingsDirectory = Directory.CreateDirectory(Path.Combine(Globals.PathToOutput, PathToMappings));
-        DirectoryInfo intermediaryDirectory = Directory.CreateDirectory(Path.Combine(Globals.PathToOutput, PathToMappings, PathToIntermediary));
-        DirectoryInfo namedDirectory = Directory.CreateDirectory(Path.Combine(Globals.PathToOutput, PathToMappings, PathToNamed));
+        DirectoryInfo mappingsDirectory = Directory.CreateDirectory(PathToMappings);
+        DirectoryInfo intermediaryDirectory = Directory.CreateDirectory(Path.Combine(PathToMappings, PathToIntermediary));
+        DirectoryInfo namedDirectory = Directory.CreateDirectory(Path.Combine(PathToMappings, PathToNamed));
 
         AddMappingsFiles(mappingsDirectory, ObfToIntermediaryMappingsPaths, recursive: false);
         AddMappingsFiles(mappingsDirectory, IntermediaryToNamedMappingsPaths, recursive: false);
@@ -261,8 +261,8 @@ public static class Remapping {
 
     private static void AddMappingsFiles(List<string> mappingsPaths, Dictionary<Guid, string> mappings) {
         foreach (string path in mappingsPaths) {
-            if (!StringDumping.TryParseMvidFromPath(path, out Guid mvid)) 
-                mvid = StringDumping.AsDeterministicGuid(Path.GetFileNameWithoutExtension(path));
+            if (!GuidUtils.TryParseMvidFromPath(path, out Guid mvid)) 
+                mvid = GuidUtils.AsDeterministicGuid(Path.GetFileNameWithoutExtension(path));
 
             if (!mappings.TryAdd(mvid, path))
                 Console.WriteLine($"Encountered duplicate mappings file {path} for MVID `{mvid}`, skipping...");

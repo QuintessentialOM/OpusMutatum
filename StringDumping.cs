@@ -23,7 +23,7 @@ public static class StringDumping {
         string[] stringsPaths = stringsDirectory.GetFiles().Select(file => file.FullName).Concat(extraStringsPaths).ToArray();
 
         foreach (string path in stringsPaths) {
-            if (!TryParseMvidFromPath(path, out Guid mvid))
+            if (!GuidUtils.TryParseMvidFromPath(path, out Guid mvid))
                 continue;
 
             if (!StringsPaths.TryAdd(mvid, path))
@@ -31,31 +31,12 @@ public static class StringDumping {
         }
     }
 
-    public static bool TryParseMvidFromPath(string path, out Guid mvid) {
-        mvid = Guid.Empty;
+    public static void RunStringDumperAndAddPath(string stringDumperPath) {
+        AppHosting.RunExe(stringDumperPath);
 
-        string filename = Path.GetFileNameWithoutExtension(path);
-        int index = filename.LastIndexOf('_');
-        if (index < 0)
-            return false;
-
-        string guidString = filename[(index + 1)..];
-        return Guid.TryParse(guidString, out mvid);
-    }
-
-    public static Guid AsDeterministicGuid(string str) {
-
-        int hash = 17;
-        foreach (char c in str) {
-            hash = hash * 23 + c.GetHashCode();
-        }
-
-        var stringId = new byte[16];
-        for (int i = 0; i < 16; i++) {
-            stringId[i] = (byte)hash;
-            hash = hash * 29 + str[Math.Abs(hash) % str.Length].GetHashCode();
-        }
-        return new(stringId);
+        var def = AssemblyDefinition.ReadAssembly(stringDumperPath);
+        Guid mvid = def.GetMvid();
+        StringsPaths[mvid] = Path.Combine(Globals.PathToOutput, PathToStringDumping, PathToStrings, "out_" + mvid + ".csv");
     }
 
     public static bool TryLoadStrings(AssemblyDefinition assembly, out Dictionary<int, string> strings) {

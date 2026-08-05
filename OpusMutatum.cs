@@ -21,11 +21,11 @@ public static class OpusMutatum {
 
     private static void Main(string[] args) {
         HandleArguments(args);
-        Globals.tasks = TaskParser.ReadTasksFromFile();
+        Globals.Tasks = TaskParser.ReadTasksFromFile();
 
         HandleSetup();
 
-        foreach (var task in Globals.tasks.tasks) {
+        foreach (var task in Globals.Tasks.Tasks) {
             RunTask(task);
         }
         Console.WriteLine("Done.");
@@ -106,24 +106,24 @@ public static class OpusMutatum {
 
     private static void RunTask(Task task) {
         try {
-            switch (task.command) {
+            switch (task.Command) {
                 case Command.Strings:
-                    Tasks.HandleStrings(task.args);
+                    Tasks.HandleStrings(task.Args);
                     break;
                 case Command.Intermediary:
-                    Tasks.HandleIntermediarySteps(task.args);
+                    Tasks.HandleIntermediarySteps(task.Args);
                     break;
                 case Command.Merge:
-                    Tasks.HandleMerge(task.args);
+                    Tasks.HandleMerge(task.Args);
                     break;
                 case Command.Copy:
-                    Tasks.HandleCopy(task.args);
+                    Tasks.HandleCopy(task.Args);
                     break;
                 case Command.NewMod:
-                    Tasks.HandleNewMod(task.args);
+                    Tasks.HandleNewMod(task.Args);
                     break;
                 case Command.Run:
-                    Tasks.HandleRun(task.args);
+                    Tasks.HandleRun(task.Args);
                     break;
                 default:
                     break;
@@ -136,12 +136,12 @@ public static class OpusMutatum {
     }
 
     private static void HandleSetup() {
-        Globals.PathToOutput = Globals.tasks.gameDir;
-        Globals.PathToTemporaryOutput = Path.Combine(Globals.tasks.gameDir, "temp");
-        Remapping.PathToMappings = Globals.tasks.mappingDir;
+        Globals.PathToOutput = Globals.Tasks.GameDir;
+        Globals.PathToTemporaryOutput = Path.Combine(Globals.Tasks.GameDir, "temp");
+        Remapping.PathToMappings = Globals.Tasks.MappingsDir;
         //tasks.modsDir
 
-        autoExit = Globals.tasks.autoExit || autoExit;
+        autoExit = Globals.Tasks.AutoExit || autoExit;
 
         Directory.CreateDirectory(Globals.PathToOutput);
         Directory.CreateDirectory(Globals.PathToTemporaryOutput);

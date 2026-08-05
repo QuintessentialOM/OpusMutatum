@@ -66,22 +66,22 @@ public static class TaskParser {
     private static void ReadData(MutatumTasks tasks, ReadingMode mode, string line) {
         switch (mode) {
             case ReadingMode.Tasks:
-                tasks.tasks.Add(new Task(line));
+                tasks.Tasks.Add(new Task(line));
                 break;
             case ReadingMode.GameDir:
-                tasks.gameDir = line;
+                tasks.GameDir = line;
                 break;
             case ReadingMode.ModsDir:
-                tasks.modsDir = line;
+                tasks.ModsDir = line;
                 break;
             case ReadingMode.MappingsDir:
-                tasks.mappingDir = line;
+                tasks.MappingsDir = line;
                 break;
             case ReadingMode.BoundVSProjects:
-                tasks.boundVSProjects.Add(line);
+                tasks.BoundVSProjects.Add(line);
                 break;
             case ReadingMode.AutoExit:
-                tasks.autoExit = line == "true";
+                tasks.AutoExit = line == "true";
                 break;
             default:
                 break;
@@ -100,26 +100,26 @@ public static class TaskParser {
 }
 
 public class MutatumTasks {
-    public List<Task> tasks = [];
+    public List<Task> Tasks = [];
 
-    public string gameDir = "./modded";
-    public string modsDir = "./modded/Mods";
-    public string mappingDir = "./modded/Mappings";
+    public string GameDir = "./modded";
+    public string ModsDir = "./modded/Mods";
+    public string MappingsDir = "./modded/Mappings";
 
-    public bool autoExit = false;
+    public bool AutoExit = false;
 
-    public List<string> boundVSProjects;
+    public List<string> BoundVSProjects; // TODO: not just vs
 }
 
 public class Task {
-    public Command command;
-    public string[] args;
+    public Command Command;
+    public string[] Args;
 
     public Task(string line) {
         string[] items = line.Trim().Split(' ');
         List<string> argsList = new List<string>();
 
-        if (!commands.TryGetValue(items[0], out this.command)) throw new Exception("The command specified at: " + line + " is invalid");
+        if (!Commands.TryGetValue(items[0], out this.Command)) throw new Exception("The command specified at: " + line + " is invalid");
 
         bool isMultiArg = false;
         string collectedArguments = "";
@@ -139,10 +139,10 @@ public class Task {
             }
             argsList.Add(items[i]);
         }
-        args = argsList.ToArray();
+        Args = argsList.ToArray();
     }
 
-    private static Dictionary<string, Command> commands = new Dictionary<string, Command>() {
+    private static readonly Dictionary<string, Command> Commands = new() {
         { "strings", Command.Strings },
         { "intermediary", Command.Intermediary },
         { "merge", Command.Merge },

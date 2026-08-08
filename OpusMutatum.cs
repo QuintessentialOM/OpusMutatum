@@ -1,7 +1,7 @@
-﻿using System;
+﻿using OpusMutatum.Merging;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using AssemblyDefinition = Mono.Cecil.AssemblyDefinition;
 
 namespace OpusMutatum;
 

@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 
 namespace OpusMutatum;
-internal class GuidUtils {
+internal static class GuidUtils {
 
     public static bool TryParseMvidFromPath(string path, out Guid mvid) {
         mvid = Guid.Empty;
@@ -81,4 +81,6 @@ internal class GuidUtils {
 
         return assemblyDef.GetMvid() == MergeAssemblyMvids(paths);
     }
+    public static Guid GetMvid(this AssemblyDefinition assembly)
+        => assembly.MainModule.Mvid;
 }

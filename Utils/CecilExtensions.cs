@@ -18,14 +18,14 @@ namespace OpusMutatum {
         }
 
         public static MethodDefinition FindMethod(this ModuleDefinition module, string typeName, string methodName) {
-            return module.FindType(typeName).FindMethod(methodName);
+            return module.FindType(typeName).FindMethodByName(methodName);
         }
 
         public static MethodDefinition FindMethodGlobally(this ModuleDefinition module, string methodName) {
-            return module.Types.First(a => a.Methods.Any(m => m.Name == methodName)).FindMethod(methodName);
+            return module.Types.First(a => a.Methods.Any(m => m.Name == methodName)).FindMethodByName(methodName);
         }
 
-        public static MethodDefinition FindMethod(this TypeDefinition type, string methodName) {
+        public static MethodDefinition FindMethodByName(this TypeDefinition type, string methodName) {
             var method = type.Methods.Where(m => m.Name == methodName);
             if(method.Count() == 0) {
                 throw new Exception($"Cannot find method \"{methodName}\" in type \"{type.Name}\"");
@@ -90,8 +90,5 @@ namespace OpusMutatum {
 
             return reference;
         }
-
-        public static Guid GetMvid(this AssemblyDefinition assembly)
-            => assembly.MainModule.Mvid;
     }
 }

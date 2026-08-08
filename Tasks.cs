@@ -1,8 +1,7 @@
 ﻿using Mono.Cecil;
+using OpusMutatum.Merging;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Text;
 
 namespace OpusMutatum;
 public static class Tasks {
@@ -140,7 +139,7 @@ public static class Tasks {
         }
 
         Console.WriteLine($"Merging {quintessentialFilename}...");
-        Patching.RunMonoMod(asNamed ? quintDevLightningPath : intermediaryLightningPath, moddedLightningPath, dllPaths: [quintessentialPath], true);
+        Patching.RunMerge(asNamed ? quintDevLightningPath : intermediaryLightningPath, moddedLightningPath, dllPaths: [quintessentialPath], true);
 
         Console.WriteLine();
     }

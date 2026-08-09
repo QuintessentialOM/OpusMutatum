@@ -16,7 +16,7 @@ public class RunDebugger {
             File.Delete(Path.Combine(Globals.PathToOutput, "log.txt"));
         }
     }
-    public void HandleRuningProcess(Process p) {
+    public void HandleRunningProcess(Process p) {
         AsyncStreamRedirector gameLog = null;
 
         var task = System.Threading.Tasks.Task.Run(async () => {

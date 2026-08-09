@@ -8,63 +8,64 @@ using static OpusMutatum.Merging.OperationWrapper;
 namespace OpusMutatum.Merging;
 
 public class ModificationStash(MethodLayerTable layerTable) {
-
-    readonly List<Tuple<CustomAttribute, MethodDefinition, TypeDefinition, string>> ILInjectors = [];
-    readonly Dictionary<string, List<Tuple<TypeDefinition, MethodDefinition, string, WrapOperationNameData, string, int>>> WrapOperations = [];
+    private record ILInjector(CustomAttribute atrib, MethodDefinition target, TypeDefinition targetType, string nameOverride);
+    readonly List<ILInjector> ILInjectors = [];
+    private record WrapOperation(TypeDefinition targetType, MethodDefinition method, string targetMethodName, WrapOperationNameData nameData, string callMetadata, int layer);
+    readonly Dictionary<string, List<WrapOperation>> WrapOperations = [];
 
     public void PushILInjector(CustomAttribute atrib, MethodDefinition target, TypeDefinition targetType, string nameOverride = null) {
-        ILInjectors.Add(new Tuple<CustomAttribute, MethodDefinition, TypeDefinition, string>(atrib, target, targetType, nameOverride));
+        ILInjectors.Add(new(atrib, target, targetType, nameOverride));
     }
     public void PushWrapOperation(TypeDefinition targetType, MethodDefinition method, string targetMethodName, WrapOperationNameData nameData, string callMetadata, int layer, string type) {
         if (!WrapOperations.ContainsKey(type)) WrapOperations[type] = [];
-        WrapOperations[type].Add(new Tuple<TypeDefinition, MethodDefinition, string, WrapOperationNameData, string, int>(targetType, method, targetMethodName, nameData, callMetadata, layer));
+        WrapOperations[type].Add(new(targetType, method, targetMethodName, nameData, callMetadata, layer));
     }
 
     public void ApplyAllILInjectors(MonoModder modder) {
         foreach (var injector in ILInjectors) {
 
-            string targetTypeName = injector.Item3.GetPatchFullName();
-            string targetMethodName = injector.Item4 ?? layerTable.TransformOriginalMethodName(injector.Item2.Name, injector.Item3.GetPatchFullName());
+            string targetTypeName = injector.targetType.GetPatchFullName();
+            string targetMethodName = injector.nameOverride ?? layerTable.TransformOriginalMethodName(injector.target.Name, injector.targetType.GetPatchFullName());
 
-            var modifiedMethod = injector.Item3.FindMethod(injector.Item2.GetID(name: targetMethodName, type: targetTypeName));
-            var modifierAttribute = (string)injector.Item1.ConstructorArguments[0].Value;
+            var modifiedMethod = injector.targetType.FindMethod(injector.target.GetID(name: targetMethodName, type: targetTypeName));
+            var modifierAttribute = (string)injector.atrib.ConstructorArguments[0].Value;
             if (!modifierAttribute.StartsWith("MonoMod.")) modifierAttribute = "MonoMod." + modifierAttribute;
 
             var del = modder.CustomMethodAttributeHandlers[modifierAttribute];
-            del?.Invoke(null, [modifiedMethod, injector.Item1]);
-            modifiedMethod.CustomAttributes.Add(injector.Item1.Clone()); //Why doesn't the attribute appear in the decompiled code?
+            del?.Invoke(null, [modifiedMethod, injector.atrib]);
+            modifiedMethod.CustomAttributes.Add(injector.atrib.Clone()); //Why doesn't the attribute appear in the decompiled code? TODO: make it appear!?
         }
         ILInjectors.Clear();
     }
     public void ApplyAllWrapOperations() {
         foreach (var typeList in WrapOperations) {
             foreach (var wrapOperation in typeList.Value) {
-                string targetMethodName = layerTable.TransformOriginalMethodName(wrapOperation.Item3, wrapOperation.Item1.GetPatchFullName());
+                string targetMethodName = layerTable.TransformOriginalMethodName(wrapOperation.targetMethodName, wrapOperation.targetType.GetPatchFullName());
 
                 switch (typeList.Key) {
                     case "Call":
-                        GenerateForCall(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6);
+                        GenerateForCall(wrapOperation.targetType, wrapOperation.method, targetMethodName, wrapOperation.nameData, wrapOperation.callMetadata, wrapOperation.layer);
                         break;
                     case "Field-Read":
-                        GenerateForField(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6, true);
+                        GenerateForField(wrapOperation.targetType, wrapOperation.method, targetMethodName, wrapOperation.nameData, wrapOperation.callMetadata, wrapOperation.layer, true);
                         break;
                     case "Field-Write":
-                        GenerateForField(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6, false);
+                        GenerateForField(wrapOperation.targetType, wrapOperation.method, targetMethodName, wrapOperation.nameData, wrapOperation.callMetadata, wrapOperation.layer, false);
                         break;
                     case "Literal-String":
-                        GenerateForStringLiteral(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6);
+                        GenerateForStringLiteral(wrapOperation.targetType, wrapOperation.method, targetMethodName, wrapOperation.nameData, wrapOperation.callMetadata, wrapOperation.layer);
                         break;
                     case "Literal-Numeric":
-                        GenerateForNumericLiteral(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6, false);
+                        GenerateForNumericLiteral(wrapOperation.targetType, wrapOperation.method, targetMethodName, wrapOperation.nameData, wrapOperation.callMetadata, wrapOperation.layer, false);
                         break;
                     case "Literal-Enum":
-                        GenerateForNumericLiteral(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6, true);
+                        GenerateForNumericLiteral(wrapOperation.targetType, wrapOperation.method, targetMethodName, wrapOperation.nameData, wrapOperation.callMetadata, wrapOperation.layer, true);
                         break;
                     case "New":
-                        GenerateForNew(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6);
+                        GenerateForNew(wrapOperation.targetType, wrapOperation.method, targetMethodName, wrapOperation.nameData, wrapOperation.callMetadata, wrapOperation.layer);
                         break;
                     default:
-                        throw new Exception("Invalid wrap target point '" + typeList.Key + "' for method '" + wrapOperation.Item2.FullName + "'");
+                        throw new Exception("Invalid wrap target point '" + typeList.Key + "' for method '" + wrapOperation.method.FullName + "'");
                 }
             }
             typeList.Value.Clear();

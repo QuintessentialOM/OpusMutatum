@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -61,12 +62,14 @@ public static class Remapping {
 		public string GenericNameB { get; set; }
 	}
 
+    private record NamedMappings(Dictionary<string, string> Mappings, Dictionary<string, Dictionary<int, string>> AddedEnumVariants);
+
     #endregion
 
     #region Remappers
 
     private static readonly Dictionary<Guid, Mappings> ObfToIntermediaryMappings = new(); // assembly mvid -> mappings
-    private static readonly Dictionary<Guid, Dictionary<string, string>> IntermediaryToNamedMappings = new(); // unique mappings id -> mappings. TODO: refactor named mappings loading
+    private static readonly Dictionary<Guid, NamedMappings> IntermediaryToNamedMappings = new(); // unique mappings id -> mappings. TODO: refactor named mappings loading
 
     private interface IRemapper {
 		// these methods should return the current name if there is no remapping to be done
@@ -299,14 +302,15 @@ public static class Remapping {
         return false;
     }
 
-    private static bool TryLoadIntermediaryToNamedMappings(AssemblyDefinition assembly, out Dictionary<string, string> mappings) {
+    private static bool TryLoadIntermediaryToNamedMappings(AssemblyDefinition assembly, out NamedMappings namedMappings) {
         Guid mvid = assembly.GetMvid();
-        if (IntermediaryToNamedMappings.TryGetValue(mvid, out mappings)) {
+        if (IntermediaryToNamedMappings.TryGetValue(mvid, out namedMappings)) {
             Console.WriteLine("Found valid named mappings from cache.");
             return true;
         }
 
-        mappings = new Dictionary<string, string>();
+        Dictionary<string, string> mappings = [];
+        Dictionary<string, Dictionary<int, string>> addedEnumVariants = [];
 
         foreach (var pair in IntermediaryToNamedMappingsPaths) {
             string path = pair.Value;
@@ -324,7 +328,18 @@ public static class Remapping {
                         }
 
                         string[] parts = line.Split(',');
-                        mappings[parts[0]] = parts[1];
+                        if (parts[0].Contains('.')) {
+                            string[] enumVariantParts = parts[0].Split('.');
+                            var enumName = enumVariantParts[0];
+                            var enumVariantValueStr = enumVariantParts[1].Trim();
+                            // why can int.Parse not just handle `0x` prefixes itself? smh
+                            int enumVariantValue = enumVariantValueStr.StartsWith("0x") ? int.Parse(enumVariantValueStr[2..], NumberStyles.HexNumber) : int.Parse(enumVariantValueStr);
+                            if (!addedEnumVariants.ContainsKey(enumName))
+                                addedEnumVariants[enumName] = [];
+                            addedEnumVariants[enumName][enumVariantValue] = parts[1];
+                        } else {
+                            mappings[parts[0]] = parts[1];
+                        }
                     }
 
                     Console.WriteLine($"Found valid named mappings: {Path.GetFileName(path)}");
@@ -332,7 +347,9 @@ public static class Remapping {
             }
         }
 
-        IntermediaryToNamedMappings[mvid] = mappings;
+        namedMappings = new NamedMappings(mappings, addedEnumVariants);
+        IntermediaryToNamedMappings[mvid] = namedMappings;
+
         if (mappings.Count == 0) {
             Console.WriteLine("Failed to find valid named mappings!");
             return false;
@@ -376,10 +393,14 @@ public static class Remapping {
     }
 
     public static void RemapToNamed(AssemblyDefinition intermediaryAssemblyDef) {
-        if (!TryLoadIntermediaryToNamedMappings(intermediaryAssemblyDef, out Dictionary<string, string> mappings))
+        if (!TryLoadIntermediaryToNamedMappings(intermediaryAssemblyDef, out NamedMappings namedMappings))
             return;
 
-        DoRemap(new NamedRemapper(mappings), StringDumping.CollectNestedTypes(intermediaryAssemblyDef.MainModule.Types));
+        var allTypes = StringDumping.CollectNestedTypes(intermediaryAssemblyDef.MainModule.Types);
+
+        EnumVariantInjection.AddEnumVariants(allTypes, namedMappings.AddedEnumVariants);
+
+        DoRemap(new NamedRemapper(namedMappings.Mappings), allTypes);
     }
 
     #endregion

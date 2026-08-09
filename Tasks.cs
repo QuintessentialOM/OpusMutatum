@@ -229,7 +229,7 @@ public static class Tasks {
                 pathTo = item.Trim(['"']);
             } else if (asToMod) {
                 asToMod = false;
-                pathTo = Path.Combine(Globals.tasks.modsDir, item.Trim(['"']));
+                pathTo = Path.Combine(Globals.Tasks.ModsDir, item.Trim(['"']));
             } else {
                 switch (item) {
                     case "-from":
@@ -245,7 +245,7 @@ public static class Tasks {
                         Console.WriteLine($"Invalid Argument '{item}' for 'copy' task.");
                         break;
                 }
-            } 
+            }
         }
         if (pathFrom == "" || pathTo == "") {
             Console.WriteLine("Both -to and -from have to be specified for the 'copy' task.");
@@ -299,7 +299,7 @@ public static class Tasks {
             return;
         }
 
-        string path = Path.Combine(Globals.tasks.modsDir, name);
+        string path = Path.Combine(Globals.Tasks.ModsDir, name);
         if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
         Console.WriteLine("Creating Mod: " + name);
         Directory.CreateDirectory(path);

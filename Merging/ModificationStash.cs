@@ -43,25 +43,25 @@ public class ModificationStash(MethodLayerTable layerTable) {
 
                 switch (typeList.Key) {
                     case "Call":
-                        OperationWrapper.GenerateForCall(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6);
+                        GenerateForCall(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6);
                         break;
                     case "Field-Read":
-                        OperationWrapper.GenerateForField(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6, true);
+                        GenerateForField(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6, true);
                         break;
                     case "Field-Write":
-                        OperationWrapper.GenerateForField(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6, false);
+                        GenerateForField(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6, false);
                         break;
                     case "Literal-String":
-                        OperationWrapper.GenerateForStringLiteral(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6);
+                        GenerateForStringLiteral(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6);
                         break;
                     case "Literal-Numeric":
-                        OperationWrapper.GenerateForNumericLiteral(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6, false);
+                        GenerateForNumericLiteral(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6, false);
                         break;
                     case "Literal-Enum":
-                        OperationWrapper.GenerateForNumericLiteral(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6, true);
+                        GenerateForNumericLiteral(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6, true);
                         break;
                     case "New":
-                        OperationWrapper.GenerateForNew(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6);
+                        GenerateForNew(wrapOperation.Item1, wrapOperation.Item2, targetMethodName, wrapOperation.Item4, wrapOperation.Item5, wrapOperation.Item6);
                         break;
                     default:
                         throw new Exception("Invalid wrap target point '" + typeList.Key + "' for method '" + wrapOperation.Item2.FullName + "'");

@@ -26,7 +26,7 @@ public static class Globals {
     public static string PathToModdedLightning = "ModdedLightning.dll";
     public static string PathToQuintDevLightning = "QuintDevLightning.dll";
 
-    public static MutatumTasks tasks = null;
+    public static MutatumTasks Tasks = null;
 
     private static readonly Dictionary<string, Assembly> CachedAssemblies = new();
     private static readonly Dictionary<string, AssemblyDefinition> CachedAssemblyDefs = new();
@@ -83,7 +83,7 @@ public static class Globals {
         if (logConsoleNormal) Console.WriteLine($"Found {filename}: {assemblyDef!.FullName}");
         return true;
     }
-    
+
     public static bool TryLoadLightningExe(out AssemblyDefinition lightningExeAssemblyDef)
         => TryLoadAssemblyDef(PathToLightningExe, out lightningExeAssemblyDef);
 
@@ -116,7 +116,7 @@ public static class Globals {
         Process process = new() { StartInfo = startInfo };
         debugger?.BeforeProcessStart();
         process.Start();
-        debugger?.HandleRuningProcess(process);
+        debugger?.HandleRunningProcess(process);
         process.WaitForExit();
 
         Console.WriteLine($"Process exited with code {process.ExitCode}.");

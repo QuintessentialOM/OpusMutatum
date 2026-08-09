@@ -22,7 +22,7 @@ public class RunDebugger {
         var task = System.Threading.Tasks.Task.Run(async () => {
             if (readLogs) {
                 for (int i = 0; i < logReadRetries; i++) {
-                    Thread.Sleep(1000);
+                    Thread.Sleep(1000); // Sleeping to avoid crashing the game by reading log.txt before the game opens the file. TODO: actually wait for file to be open
                     if (File.Exists(Path.Combine(Globals.PathToOutput, "log.txt"))) {
                         try {
                             FileStream logStream = new FileStream(Path.Combine(Globals.PathToOutput, "log.txt"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
@@ -57,7 +57,7 @@ public class RunDebugger {
 
                     var inputCount = await Source.ReadAsync(buffer, 0, 16384, cancellation.Token);
                     if (!exitOnEmptySource) {
-                        Thread.Sleep(2); // TODO: find a better way to wait for new available data 
+                        Thread.Sleep(2); // TODO: find a better way to wait for new available data
                     } else if (inputCount <= 0) break;
 
                     await Sink.WriteAsync(buffer, 0, inputCount, cancellation.Token);

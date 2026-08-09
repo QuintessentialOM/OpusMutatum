@@ -6,7 +6,7 @@ using System.Collections.Generic;
 namespace OpusMutatum.Merging;
 
 public class MethodLayerTable {
-    readonly Dictionary<Tuple<string, string>, int> layerTable = [];
+    readonly Dictionary<Tuple<string, string>, int> LayerTable = [];
 
     public string PushMethodLayer(TypeDefinition targetType, MethodDefinition method) {
         var typeName = targetType.GetPatchFullName();
@@ -17,20 +17,20 @@ public class MethodLayerTable {
             return method.Name;
         }
 
-        if (layerTable.TryGetValue(identifier, out var layerCount)) {
+        if (LayerTable.TryGetValue(identifier, out var layerCount)) {
 
-            layerTable[identifier] = layerCount + 1;
+            LayerTable[identifier] = layerCount + 1;
             return "layer_" + layerCount + "_" + method.Name;
         }
 
-        layerTable[identifier] = 1;
+        LayerTable[identifier] = 1;
         return "layer_0_" + method.Name;
     }
 
     public string TransformOriginalMethodName(string methodName, string typeName) {
         var identifier = new Tuple<string, string>(typeName, methodName);
 
-        if (layerTable.TryGetValue(identifier, out var layerCount)) {
+        if (LayerTable.TryGetValue(identifier, out var layerCount)) {
             return "layer_0_" + methodName;
         }
         return methodName;
@@ -39,7 +39,7 @@ public class MethodLayerTable {
     public string ReduceToOriginalMethodName(string methodName, string typeName) {
         if (methodName.StartsWith("layer_0_")) {
             var identifier = new Tuple<string, string>(typeName, methodName[8..]);
-            if (!layerTable.TryGetValue(identifier, out var layerCount) || layerCount < 1) {
+            if (!LayerTable.TryGetValue(identifier, out var layerCount) || layerCount < 1) {
                 return methodName[8..];
             }
         }

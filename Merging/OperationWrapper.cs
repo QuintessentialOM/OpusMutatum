@@ -12,7 +12,7 @@ namespace OpusMutatum.Merging;
 
 // TODO: add better error state throws ( for example when stringLiteral is null ).
 public class OperationWrapper(ModificationStash stash) {
-    readonly Dictionary<Tuple<string, string, string>, List<MethodReference>> wrapTable = [];
+    readonly Dictionary<Tuple<string, string, string>, List<MethodReference>> WrapTable = [];
 
 
     public void Push(CustomAttribute atrib, MethodDefinition method, TypeDefinition targetType) {
@@ -24,9 +24,9 @@ public class OperationWrapper(ModificationStash stash) {
         // TODO add support for method overrides for wrapTarget
         // TODO guarantee uniqueness even when only method params differ
         var identifier = new Tuple<string, string, string>(targetType.GetPatchFullName(), targetMethodName, uniqueSpecifier);
-        if (!wrapTable.TryGetValue(identifier, out var callerMethods)) {
+        if (!WrapTable.TryGetValue(identifier, out var callerMethods)) {
             callerMethods = [];
-            wrapTable[identifier] = callerMethods;
+            WrapTable[identifier] = callerMethods;
         }
         callerMethods.Add(method);
 

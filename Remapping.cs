@@ -65,8 +65,8 @@ public static class Remapping {
 
     #region Remappers
 
-    private static readonly Dictionary<Guid, Mappings> ObfToIntermediaryMappings = new();
-    private static readonly Dictionary<Guid, Dictionary<string, string>> IntermediaryToNamedMappings = new();
+    private static readonly Dictionary<Guid, Mappings> ObfToIntermediaryMappings = new(); // assembly mvid -> mappings
+    private static readonly Dictionary<Guid, Dictionary<string, string>> IntermediaryToNamedMappings = new(); // unique mappings id -> mappings. TODO: refactor named mappings loading
 
     private interface IRemapper {
 		// these methods should return the current name if there is no remapping to be done
@@ -261,7 +261,7 @@ public static class Remapping {
 
     private static void AddMappingsFiles(List<string> mappingsPaths, Dictionary<Guid, string> mappings) {
         foreach (string path in mappingsPaths) {
-            if (!GuidUtils.TryParseMvidFromPath(path, out Guid mvid)) 
+            if (!GuidUtils.TryParseMvidFromPath(path, out Guid mvid))
                 mvid = GuidUtils.AsDeterministicGuid(Path.GetFileNameWithoutExtension(path));
 
             if (!mappings.TryAdd(mvid, path))

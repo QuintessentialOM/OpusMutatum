@@ -11,14 +11,14 @@ namespace OpusMutatum.Merging;
 public class MergeModder : MonoModder {
     private const string LogID = "Merger";
 
-    public readonly MethodLayerTable layerTable;
-    public readonly ModificationStash stash;
-    public readonly OperationWrapper operationWrapper;
+    public readonly MethodLayerTable LayerTable;
+    public readonly ModificationStash Stash;
+    public readonly OperationWrapper OpWrapper;
 
     public MergeModder() {
-        layerTable = new();
-        stash = new(layerTable);
-        operationWrapper = new(stash);
+        LayerTable = new();
+        Stash = new(LayerTable);
+        OpWrapper = new(Stash);
     }
 
     public override void Log(string text) {
@@ -29,8 +29,8 @@ public class MergeModder : MonoModder {
     public override void PatchModule(ModuleDefinition mod) {
         base.PatchModule(mod);
 
-        stash.ApplyAllILInjectors(this);
-        stash.ApplyAllWrapOperations();
+        Stash.ApplyAllILInjectors(this);
+        Stash.ApplyAllWrapOperations();
     }
 
     public override MethodDefinition PatchMethod(TypeDefinition targetType, MethodDefinition method) {
@@ -39,7 +39,7 @@ public class MergeModder : MonoModder {
             return null;
 
         if (method.GetCustomAttribute("MonoMod.MonoModWrapOperation") is CustomAttribute wrapAtrib && wrapAtrib != null) {
-            operationWrapper.Push(wrapAtrib, method, targetType);
+            OpWrapper.Push(wrapAtrib, method, targetType);
         }
 
 
@@ -92,7 +92,7 @@ public class MergeModder : MonoModder {
         }
 
         if (method.GetCustomAttribute("MonoMod.MonoModILInject") is CustomAttribute injectAtrib && injectAtrib != null) {
-            stash.PushILInjector(injectAtrib, method, targetType);
+            Stash.PushILInjector(injectAtrib, method, targetType);
             if (method.HasCustomAttribute("MonoMod.MonoModIgnore") || method.Body.CodeSize <= 2) // Return if method only contains 'nop' then 'ret' too.
                 return null;
         }
@@ -107,7 +107,7 @@ public class MergeModder : MonoModder {
 
         } else if (existingMethod != null) {
             origMethod = existingMethod.Clone();
-            origMethod.Name = layerTable.PushMethodLayer(targetType, method);
+            origMethod.Name = LayerTable.PushMethodLayer(targetType, method);
             origMethod.Attributes = existingMethod.Attributes & ~MethodAttributes.SpecialName & ~MethodAttributes.RTSpecialName;
             origMethod.MetadataToken = GetMetadataToken(TokenType.Method);
             origMethod.IsVirtual = false; // Fix overflow when calling orig_ method, but orig_ method already defined higher up

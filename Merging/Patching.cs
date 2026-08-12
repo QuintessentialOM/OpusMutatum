@@ -54,6 +54,7 @@ public static class Patching {
 
                 modder.MapDependencies();
                 modder.Log("[Main] Begin patching.");
+                modder.PrePatchAssembly();
                 modder.AutoPatch();
                 modder.Write(null, null);
                 modder.Log("[Main] Done.");

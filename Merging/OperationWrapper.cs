@@ -49,17 +49,18 @@ public class OperationWrapper(ModificationStash stash) {
         var modifiedMethod = targetType.FindMethodByName(methodName: targetMethodName)
             ?? throw new Exception($"Failed to identify target method for '{method.Name}'");
 
+        var functMethod = GenerateFunctMethod(targetType, origCalledMethod, nameData.GenerateName(layer));
+        var functField = targetType.GetCompilerGeneratedFuncField(functMethod);
+
         if (layer == 0) {
-            var functMethod = GenerateFunctMethod(targetType, origCalledMethod, nameData.GenerateName(layer));
-            InjectMethodCall(modifiedMethod, origCalledMethod, functMethod, method);
+            InjectMethodCall(modifiedMethod, origCalledMethod, functField, method);
         } else {
             var compilerType = targetType.GetCompilerGeneratedType();
-            var previousFunct = compilerType.FindMethodByName(nameData.GenerateName(layer - 1));
+            var previousFunct = compilerType.FindField(nameData.GenerateName(layer - 1) + "_f");
             var previousCall = GetPreviousCall(modifiedMethod, previousFunct);
 
-            var functMethod = GenerateFunctMethod(targetType, origCalledMethod, nameData.GenerateName(layer));
             InjectMethodCall(functMethod, origCalledMethod, previousFunct, previousCall);
-            ReplaceInjectedCall(modifiedMethod, previousFunct, functMethod, previousCall, method);
+            ReplaceInjectedCall(modifiedMethod, previousFunct, functField, previousCall, method);
         }
     }
 
@@ -85,16 +86,14 @@ public class OperationWrapper(ModificationStash stash) {
 
         return baseLayer;
     }
-    public static void InjectMethodCall(MethodDefinition targetMethod, MethodDefinition origCalledMethod, MethodDefinition functMethod, MethodDefinition calledMethod) {
+    public static void InjectMethodCall(MethodDefinition targetMethod, MethodDefinition origCalledMethod, FieldReference functField, MethodDefinition calledMethod) {
         if (targetMethod.HasBody) {
             ILCursor cursor = new(new ILContext(targetMethod));
             while (cursor.TryGotoNext(MoveType.Before,
                 instr => instr.MatchCallWeak(origCalledMethod)
             )) {
                 cursor.Remove();
-                cursor.EmitLdnull();
-                cursor.EmitLdftn(functMethod);
-                cursor.EmitNewobj(functMethod.GetFuncCtor());
+                cursor.EmitLdsfld(functField);
                 cursor.EmitCall(calledMethod);
             }
         }
@@ -112,23 +111,23 @@ public class OperationWrapper(ModificationStash stash) {
         var modifiedMethod = targetType.FindMethodByName(methodName: targetMethodName)
             ?? throw new Exception($"Failed to identify target method for '{method.Name}'");
 
+        var functMethod = isRead ? GenerateFunctReadFieldMethod(targetType, origCalledField, nameData.GenerateName(layer))
+                               : GenerateFunctWriteFieldMethod(targetType, origCalledField, nameData.GenerateName(layer));
+        var functField = targetType.GetCompilerGeneratedFuncField(functMethod);
+
         if (layer == 0) {
-            
-            var funcMethod = isRead ? GenerateFunctReadFieldMethod(targetType, origCalledField, nameData.GenerateName(layer))
-                                   : GenerateFunctWriteFieldMethod(targetType, origCalledField, nameData.GenerateName(layer));
-            InjectMethodCall(modifiedMethod, origCalledField, funcMethod, method, isRead);
+            InjectMethodCall(modifiedMethod, origCalledField, functField, method, isRead);
         } else {
             var compilerType = targetType.GetCompilerGeneratedType();
-            var previousFunct = compilerType.FindMethodByName(nameData.GenerateName(layer - 1));
-            var previousCall = GetPreviousCall(modifiedMethod, previousFunct);
+            var previousFunct = compilerType.FindField(nameData.GenerateName(layer - 1) + "_f");
 
-            var functMethod = isRead ? GenerateFunctReadFieldMethod(targetType, origCalledField, nameData.GenerateName(layer))
-                                    : GenerateFunctWriteFieldMethod(targetType, origCalledField, nameData.GenerateName(layer));
             if (isRead) {
+                var previousCall = GetPreviousCall(modifiedMethod, previousFunct);
                 InjectMethodCall(functMethod, origCalledField, previousFunct, previousCall, true);
-                ReplaceInjectedCall(modifiedMethod, previousFunct, functMethod, previousCall, method);
+                ReplaceInjectedCall(modifiedMethod, previousFunct, functField, previousCall, method);
             } else {
-                InjectMethodCall(previousFunct, origCalledField, functMethod, method, false);
+                var previousFunctMethod = compilerType.FindMethodByName(nameData.GenerateName(layer - 1));
+                InjectMethodCall(previousFunctMethod, origCalledField, functField, method, false);
             }
         }
     }
@@ -172,16 +171,14 @@ public class OperationWrapper(ModificationStash stash) {
 
         return baseLayer;
     }
-    public static void InjectMethodCall(MethodDefinition targetMethod, FieldDefinition origCalledField, MethodDefinition functMethod, MethodDefinition calledMethod, bool isRead) {
+    public static void InjectMethodCall(MethodDefinition targetMethod, FieldDefinition origCalledField, FieldReference functField, MethodDefinition calledMethod, bool isRead) {
         if (targetMethod.HasBody) {
             ILCursor cursor = new(new ILContext(targetMethod));
             while (cursor.TryGotoNext(MoveType.Before,
                 instr => isRead ? instr.MatchLdfldWeak(origCalledField) : instr.MatchStfldWeak(origCalledField)
             )) {
                 cursor.Remove();
-                cursor.EmitLdnull();
-                cursor.EmitLdftn(functMethod);
-                cursor.EmitNewobj(functMethod.GetFuncCtor());
+                cursor.EmitLdsfld(functField);
                 cursor.EmitCall(calledMethod);
             }
         }
@@ -282,17 +279,18 @@ public class OperationWrapper(ModificationStash stash) {
         var ctorMehotd = objType.FindMethod(method.GetIDWithIgnore(name: ".ctor", type: objType.FullName, returnTypeOverride: GetVoidRef(), ignoreFirstParam: !modifiedMethod.IsStatic, nonStaticBaseType: method.IsStatic ? null : method.DeclaringType))
             ?? throw new Exception($"Failed to identify ctor method for '{method.Name}'");
 
+        var functMethod = GenerateFunctMethodWithNew(targetType, ctorMehotd, objType, nameData.GenerateName(layer));
+        var functField = targetType.GetCompilerGeneratedFuncField(functMethod);
+
         if (layer == 0) {
-            var functMethod = GenerateFunctMethodWithNew(targetType, ctorMehotd, objType, nameData.GenerateName(layer));
-            InjectMethodCallAtNew(modifiedMethod, ctorMehotd, functMethod, method);
+            InjectMethodCallAtNew(modifiedMethod, ctorMehotd, functField, method);
         } else {
             var compilerType = targetType.GetCompilerGeneratedType();
-            var previousFunct = compilerType.FindMethodByName(nameData.GenerateName(layer - 1));
+            var previousFunct = compilerType.FindField(nameData.GenerateName(layer - 1) + "_f");
             var previousCall = GetPreviousCall(modifiedMethod, previousFunct);
 
-            var functMethod = GenerateFunctMethodWithNew(targetType, ctorMehotd, objType, nameData.GenerateName(layer));
             InjectMethodCallAtNew(functMethod, ctorMehotd, previousFunct, previousCall);
-            ReplaceInjectedCall(modifiedMethod, previousFunct, functMethod, previousCall, method);
+            ReplaceInjectedCall(modifiedMethod, previousFunct, functField, previousCall, method);
         }
     }
     
@@ -313,16 +311,14 @@ public class OperationWrapper(ModificationStash stash) {
 
         return baseLayer;
     }
-    public static void InjectMethodCallAtNew(MethodDefinition targetMethod, MethodDefinition origCalledMethod, MethodDefinition functMethod, MethodDefinition calledMethod) {
+    public static void InjectMethodCallAtNew(MethodDefinition targetMethod, MethodDefinition origCalledMethod, FieldReference functField, MethodDefinition calledMethod) {
         if (targetMethod.HasBody) {
             ILCursor cursor = new(new ILContext(targetMethod));
             while (cursor.TryGotoNext(MoveType.Before,
                 instr => instr.MatchNewobjWeak(origCalledMethod)
             )) {
                 cursor.Remove();
-                cursor.EmitLdnull();
-                cursor.EmitLdftn(functMethod);
-                cursor.EmitNewobj(functMethod.GetFuncCtor());
+                cursor.EmitLdsfld(functField);
                 cursor.EmitCall(calledMethod);
                 if (!targetMethod.IsStatic) {
                     cursor.GotoFirstArgumentInsert(out int origIndex);
@@ -336,30 +332,27 @@ public class OperationWrapper(ModificationStash stash) {
     #endregion
 
 
-    public static MethodDefinition GetPreviousCall(MethodDefinition targetMethod, MethodDefinition functMethod) {
+    public static MethodDefinition GetPreviousCall(MethodDefinition targetMethod, FieldReference funcField) {
         if (targetMethod.HasBody) {
             ILCursor cursor = new(new ILContext(targetMethod));
             while (cursor.TryGotoNext(MoveType.After,
-                instr => instr.MatchLdftn(functMethod),
-                instr => instr.MatchNewobjWeak(functMethod.GetFuncCtor()),
+                instr => instr.MatchLdsfld(funcField),
                 instr => instr.OpCode == OpCodes.Call
             )) {
                 return ((MethodReference)cursor.Previous.Operand).SafeResolve();
             }
         }
-        throw new Exception($"Failed to find associated call for'{functMethod.Name}' in '{targetMethod}'");
+        throw new Exception($"Failed to find associated call for'{funcField.Name}' in '{targetMethod}'");
     }
-    public static void ReplaceInjectedCall(MethodDefinition targetMethod, MethodDefinition fromFunct, MethodDefinition toFunct, MethodDefinition fromCall, MethodDefinition toCall) {
+    public static void ReplaceInjectedCall(MethodDefinition targetMethod, FieldReference fromFunct, FieldReference toFunct, MethodDefinition fromCall, MethodDefinition toCall) {
         if (targetMethod.HasBody) {
             ILCursor cursor = new(new ILContext(targetMethod));
             while (cursor.TryGotoNext(MoveType.Before,
-                instr => instr.MatchLdftn(fromFunct),
-                instr => instr.MatchNewobjWeak(fromFunct.GetFuncCtor()),
+                instr => instr.MatchLdsfld(fromFunct),
                 instr => instr.MatchCall(fromCall)
             )) {
-                cursor.RemoveRange(3);
-                cursor.EmitLdftn(toFunct);
-                cursor.EmitNewobj(toFunct.GetFuncCtor());
+                cursor.RemoveRange(2);
+                cursor.EmitLdsfld(toFunct);
                 cursor.EmitCall(toCall);
             }
         }

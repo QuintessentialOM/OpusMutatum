@@ -24,6 +24,39 @@ public static class MethodGeneration {
         generated.IsSpecialName = true;
 
         targetType.NestedTypes.Add(generated);
+        generated.GetCctor(); // Just to generate the .cctor as the first method;
+        return generated;
+    }
+    public static FieldReference GetCompilerGeneratedFuncField(this TypeDefinition targetType, MethodDefinition method) {
+        if (!method.IsStatic) throw new Exception("GetCompilerGeneratedFuncField must use a static method.");
+        TryLoadCoreLib(out AssemblyDefinition coreLibAssemblyDef);
+        var compilerType = targetType.GetCompilerGeneratedType();
+        var cctor = GetCctor(compilerType);
+        var funcCtor = method.GetFuncCtor();
+        var funcField = new FieldDefinition(method.Name + "_f", FieldAttributes.Static | FieldAttributes.Public | FieldAttributes.InitOnly, funcCtor.DeclaringType);
+
+        compilerType.Fields.Add(funcField);
+
+        ILCursor cursor = new(new ILContext(cctor));
+        cursor.EmitNop();
+        cursor.EmitLdnull();
+        cursor.EmitLdftn(method);
+        cursor.EmitNewobj(funcCtor);
+        cursor.EmitStsfld(funcField);
+
+        return funcField;
+    }
+    private static MethodDefinition GetCctor(this TypeDefinition targetType) {
+        var generated = targetType.Methods.FirstOrDefault(method => method.Name == ".cctor", defaultValue: null);
+        if (generated != null) return generated;
+
+        generated = new MethodDefinition(".cctor", MethodAttributes.Static | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName | MethodAttributes.Private, GetVoidRef());
+        generated.Body = new MethodBody(generated);
+        generated.DeclaringType = targetType;
+
+        ILCursor cursor = new(new ILContext(generated));
+        cursor.EmitRet();
+        targetType.Methods.Add(generated);
         return generated;
     }
 

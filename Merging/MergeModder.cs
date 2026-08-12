@@ -206,4 +206,10 @@ public class MergeModder : MonoModder {
 
         return method;
     }
+
+    public void PrePatchAssembly() {
+        foreach (var item in Module.Types) {
+            item.IsSealed = false;
+        }
+    }
 }

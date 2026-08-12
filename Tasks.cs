@@ -78,7 +78,6 @@ public static class Tasks {
     }
 
     private static void HandleDependencies() {
-        // TODO: add caching
         Console.WriteLine("Setting up native libraries...");
         DependencyHandling.SetupNativeLibs();
 
@@ -86,7 +85,7 @@ public static class Tasks {
         ContentHandling.CreateContentSymlinks();
 
         Console.WriteLine();
-    }
+    } // TODO: add caching
 
     private static void HandleIntermediary(bool onlyOnChange) {
         // TODO: MonoMod relinking?

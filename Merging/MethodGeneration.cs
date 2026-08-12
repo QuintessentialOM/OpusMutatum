@@ -19,7 +19,7 @@ public static class MethodGeneration {
 
         generated = new TypeDefinition(targetType.Namespace, GeneratedClassName, TypeAttributes.NestedPublic | TypeAttributes.Sealed);
         generated.DeclaringType = targetType;
-        generated.BaseType = targetType.BaseType; // Maybe should find System.Object instead, if there is an ergonomic way.
+        generated.BaseType = targetType.Module.TypeSystem.Object;
         generated.IsClass = true;
         generated.IsSpecialName = true;
 
@@ -48,19 +48,19 @@ public static class MethodGeneration {
 
     public static TypeReference GetVoidRef() {
         TryLoadCoreLib(out AssemblyDefinition coreLibAssemblyDef);
-        return coreLibAssemblyDef.MainModule.FindType("System.Void");
+        return coreLibAssemblyDef.MainModule.TypeSystem.Void;
     }
     public static TypeReference GetIntRef() {
         TryLoadCoreLib(out AssemblyDefinition coreLibAssemblyDef);
-        return coreLibAssemblyDef.MainModule.FindType("System.Int32");
+        return coreLibAssemblyDef.MainModule.TypeSystem.Int32;
     }
     public static TypeReference GetUIntRef() {
         TryLoadCoreLib(out AssemblyDefinition coreLibAssemblyDef);
-        return coreLibAssemblyDef.MainModule.FindType("System.UInt32");
+        return coreLibAssemblyDef.MainModule.TypeSystem.UInt32;
     }
     public static TypeReference GetBoolRef() {
         TryLoadCoreLib(out AssemblyDefinition coreLibAssemblyDef);
-        return coreLibAssemblyDef.MainModule.FindType("System.Boolean");
+        return coreLibAssemblyDef.MainModule.TypeSystem.Boolean;
     }
     #endregion
 
@@ -324,15 +324,16 @@ public static class MethodGeneration {
         return ambigousType;
     }
     public static void MoveToSameStackLevelInstruction(this ILCursor cursor, ref int deltaStack, bool forwards = true, Queue<Tuple<int, int, bool>> branchQueue = null, bool doSpecialTypeFind = false) { // start before the instruction the question was asked for
+        bool isVoidReturnMethod = cursor.Method.ReturnType.Name == "System.Void";
         if (forwards) {
             @continue:
             do {
-                deltaStack += cursor.Prev.GetDeltaStackPush(cursor.Method.ReturnType.Name == "System.Void");
+                deltaStack += cursor.Prev.GetDeltaStackPush(isVoidReturnMethod);
                 cursor.HandelBranch(ref deltaStack, true, branchQueue);
-                deltaStack += cursor.Next.GetDeltaStackPop(cursor.Method.ReturnType.Name == "System.Void");
+                deltaStack += cursor.Next.GetDeltaStackPop(isVoidReturnMethod);
                 cursor.Index++;
-                if (cursor.Index >= cursor.Instrs.Count) throw new Exception("Reached end of method: " + cursor.Method.FullName);
-            } while (deltaStack >= 0 && cursor.Prev.OpCode != OpCodes.Dup);
+                if (cursor.Index > cursor.Instrs.Count) throw new Exception("Reached end of method: " + cursor.Method.FullName);
+            } while (deltaStack >= 0);
             if (doSpecialTypeFind) {
                 switch (cursor.Prev.OpCode.Code) {
                     case Code.Not:
@@ -383,9 +384,9 @@ public static class MethodGeneration {
             do {
                 cursor.Index--;
                 if (cursor.Index <= 0) throw new Exception("Reached end of method: " + cursor.Method.FullName);
-                deltaStack -= cursor.Next.GetDeltaStackPop(cursor.Method.ReturnType.Name == "System.Void");
+                deltaStack -= cursor.Next.GetDeltaStackPop(isVoidReturnMethod);
                 cursor.HandelBranch(ref deltaStack, false, branchQueue);
-                deltaStack -= cursor.Prev.GetDeltaStackPush(cursor.Method.ReturnType.Name == "System.Void");
+                deltaStack -= cursor.Prev.GetDeltaStackPush(isVoidReturnMethod);
             } while (deltaStack >= 0);
             if (doSpecialTypeFind) {
                 switch (cursor.Prev.OpCode.Code) {
@@ -434,7 +435,7 @@ public static class MethodGeneration {
                             var operandMethodRef = (MethodReference)operandMethod;
                             return operandMethodRef.DeclaringType;
                         } catch (InvalidCastException e) {
-                            throw new Exception("Failed to get TypeReference from stack data for.", e);
+                            throw new Exception("Failed to get TypeReference from stack data.", e);
                         }
                     }
                     parameterIndex--; // NonStatic method & we're not searching for the base type
@@ -671,7 +672,7 @@ public static class MethodGeneration {
             case Code.Dup:
                 throw new Exception("Invalid OpCode found: " + cursor.Previous.OpCode.Name);
             case Code.Pop:
-                throw new NotImplementedException("Unable to find type for 'pop' Instruction, it is popped of the stack without use.");
+                throw new NotImplementedException("Unable to find type for 'pop' Instruction, type is popped of the stack without use.");
             default:
                 throw new Exception("Unexpected OpCode found: " + cursor.Previous.OpCode.Name);
         }
@@ -689,7 +690,7 @@ public static class MethodGeneration {
             case Code.Ldfld:
             case Code.Ldsfld:
                 return ((FieldReference)cursor.Previous.Operand).FieldType;
-            case Code.Newarr:   // This is not the type of the arry but the type for it's elements might searched here.
+            case Code.Newarr:   // This is not the type of the array but the type of it's elements might searched here.
             case Code.Unbox:
             case Code.Unbox_Any:
                 return (TypeReference)cursor.Previous.Operand;
@@ -930,7 +931,7 @@ public static class MethodGeneration {
             case Code.Dup:
                 throw new Exception("Invalid OpCode found: " + cursor.Previous.OpCode.Name);
             case Code.Pop:
-                throw new NotImplementedException("Unable to find type for 'pop' Instruction, it is popped of the stack without use.");
+                throw new NotImplementedException("Unable to find type for 'pop' Instruction, type is popped of the stack without use.");
             default:
                 throw new Exception("Unexpected OpCode found: " + cursor.Previous.OpCode.Name);
         }

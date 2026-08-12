@@ -26,7 +26,7 @@ public static class OpusMutatum {
         HandleSetup();
 
         foreach (var task in Globals.Tasks.Tasks) {
-            RunTask(task);
+            if(RunTask(task)) break;
         }
         Console.WriteLine("Done.");
         if (!autoExit) Console.ReadKey(); // keep command line open
@@ -104,7 +104,7 @@ public static class OpusMutatum {
         Remapping.LoadMappingsPaths(extraIntermediaryMappingPaths, extraNamedMappingPaths);
     }
 
-    private static void RunTask(Task task) {
+    private static bool RunTask(Task task) {
         try {
             switch (task.Command) {
                 case Command.Strings:
@@ -132,14 +132,15 @@ public static class OpusMutatum {
         } catch (Exception e) {
             Console.WriteLine("Error executing task:");
             Console.WriteLine(e.ToString());
+            return true;
         }
+        return false;
     }
 
     private static void HandleSetup() {
         Globals.PathToOutput = Globals.Tasks.GameDir;
         Globals.PathToTemporaryOutput = Path.Combine(Globals.Tasks.GameDir, "temp");
         Remapping.PathToMappings = Globals.Tasks.MappingsDir;
-        //tasks.modsDir
 
         autoExit = Globals.Tasks.AutoExit || autoExit;
 

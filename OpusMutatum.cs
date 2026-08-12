@@ -140,6 +140,8 @@ public static class OpusMutatum {
     private static void HandleSetup() {
         Globals.PathToOutput = Globals.Tasks.GameDir;
         Globals.PathToTemporaryOutput = Path.Combine(Globals.Tasks.GameDir, "temp");
+        ModLoader.PathToMods = Globals.Tasks.ModsDir;
+        ModLoader.PathToUnpackedMods = Path.Combine(Globals.Tasks.GameDir, "UnpackedMods");
         Remapping.PathToMappings = Globals.Tasks.MappingsDir;
 
         autoExit = Globals.Tasks.AutoExit || autoExit;

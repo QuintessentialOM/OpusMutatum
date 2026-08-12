@@ -58,7 +58,7 @@ public static class Tasks {
 
         HandleIntermediary(onlyOnChange);
         Console.WriteLine();
-        HandleQuintDevExe(onlyOnChange);
+        HandleQuintDevExe(onlyOnChange);    // TODO don't skip this step when mappings change, add MergeModder.PrePatchAssembly() step.
     }
 
     private static void HandleCoreify(bool onlyOnChange) {
@@ -119,26 +119,19 @@ public static class Tasks {
                     break;
             }
         }
+        ModLoader.LoadMods(); // TODO: add caching
+        Console.WriteLine();
+        string[] dllPaths = [.. ModLoader.DllPaths];
 
-
-        string quintessentialPath = Path.Combine(Globals.PathToOutput, Patching.PathToQuintessential);
-        string quintessentialFilename = Path.GetFileName(quintessentialPath);
-        string intermediaryLightningPath = Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning);
+        string asmFrom = Path.Combine(Globals.PathToOutput, asNamed ? Globals.PathToQuintDevLightning : Globals.PathToIntermediaryLightning);
         string moddedLightningPath = Path.Combine(Globals.PathToOutput, Globals.PathToModdedLightning);
-        string quintDevLightningPath = Path.Combine(Globals.PathToOutput, Globals.PathToQuintDevLightning);
 
-        if (!File.Exists(quintessentialPath)) {
-            Console.WriteLine($"Failed to find {quintessentialFilename}, skipping merge!");
-            return;
-        }
-        string[] assembliesMerged = [quintessentialPath, asNamed ? quintDevLightningPath : intermediaryLightningPath];
-        if (onlyOnChange && GuidUtils.SameMvidAssemblies(assembliesMerged, moddedLightningPath)) {
+        if (onlyOnChange && GuidUtils.SameMvidAssemblies([.. dllPaths, asmFrom], moddedLightningPath)) {
             Console.WriteLine("Found cache, skipping modded assembly generation.");
             return;
         }
 
-        Console.WriteLine($"Merging {quintessentialFilename}...");
-        Patching.RunMerge(asNamed ? quintDevLightningPath : intermediaryLightningPath, moddedLightningPath, dllPaths: [quintessentialPath], true);
+        Patching.RunMerge(asmFrom, moddedLightningPath, dllPaths: dllPaths, true);
 
         Console.WriteLine();
     }

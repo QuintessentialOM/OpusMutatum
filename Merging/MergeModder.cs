@@ -209,7 +209,8 @@ public class MergeModder : MonoModder {
 
     public void PrePatchAssembly() {
         foreach (var item in Module.Types) {
-            item.IsSealed = false;
+            if (item.BaseType.FullName != "System.MulticastDelegate" && item.BaseType.FullName != "System.Delegate" && item.BaseType.FullName != "System.Enum")
+                item.IsSealed = false;
         }
     }
 }

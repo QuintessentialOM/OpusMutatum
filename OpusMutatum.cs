@@ -113,6 +113,9 @@ public static class OpusMutatum {
                 case Command.Intermediary:
                     Tasks.HandleIntermediarySteps(task.Args);
                     break;
+                case Command.DevExe:
+                    Tasks.HandleDevExe(task.Args);
+                    break;
                 case Command.Merge:
                     Tasks.HandleMerge(task.Args);
                     break;

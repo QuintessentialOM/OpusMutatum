@@ -136,15 +136,46 @@ public static class Tasks {
         Console.WriteLine();
     }
 
-    public static void HandleDevExe() {
-        // take ModdedLightning.exe, remap to named
-        if (!Globals.TryLoadModdedLightning(out AssemblyDefinition moddedLightning))
+    public static void HandleDevExe(string[] args) {
+        bool onlyOnChange = false;
+        bool asId = false;
+        string modId = "";
+        foreach (var item in args) {
+            if (asId) {
+                asId = false;
+                modId = item.Trim(['"']);
+            } else {
+                switch (item) {
+                    case "--onlyOnChange":
+                        onlyOnChange = true;
+                        break;
+                    case "-id":
+                        asId = true;
+                        break;
+                    default:
+                        Console.WriteLine($"Invalid Argument '{item}' for 'merge' task.");
+                        break;
+                }
+            }
+        }
+        if (modId == "") {
+            Console.WriteLine("Mod id has to be specified with -id for the 'devExe' task.");
             return;
+        }
 
+        Console.WriteLine();
         Console.WriteLine("Generating development assembly...");
-        Remapping.RemapToNamed(moddedLightning);
+        string[] dllPaths = [.. ModLoader.GetDevMods(modId, [modId, .. Globals.Tasks.DevModIds], true)];
 
-        moddedLightning.Write(Path.Combine(Globals.PathToOutput, "DevLightning.dll"));
+        string asmFrom = Path.Combine(Globals.PathToOutput, Globals.PathToQuintDevLightning);
+        string devLightningPath = Path.Combine(Globals.PathToOutput, "DevLightning.dll");
+
+        if (onlyOnChange && GuidUtils.SameMvidAssemblies([.. dllPaths, asmFrom], devLightningPath)) {
+            Console.WriteLine("Found cache, skipping development assembly generation.");
+            return;
+        }
+
+        Patching.RunMerge(asmFrom, devLightningPath, dllPaths: dllPaths, true);
         Console.WriteLine();
     }
 

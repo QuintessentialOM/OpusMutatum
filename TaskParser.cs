@@ -35,7 +35,7 @@ public static class TaskParser {
                 if (line.StartsWith('#')) { continue; }
 
                 if (line.StartsWith('*') && readingMode != ReadingMode.None) {
-                    line = line.Substring(1).Trim(new char[] { ' ' });
+                    line = line[1..].Trim([' ']);
                     isList = true;
                 } else if (isList) readingMode = ReadingMode.None;
 
@@ -124,7 +124,7 @@ public class Task {
 
     public Task(string line) {
         string[] items = line.Trim().Split(' ');
-        List<string> argsList = new List<string>();
+        List<string> argsList = [];
 
         if (!Commands.TryGetValue(items[0], out this.Command)) throw new Exception("The command specified at: " + line + " is invalid");
 
@@ -134,25 +134,25 @@ public class Task {
             if (isMultiArg) {
                 collectedArguments += " " + items[i];
 
-                if (!items[i].EndsWith("\"")) continue;
+                if (!items[i].EndsWith('\"')) continue;
                 isMultiArg = false;
                 argsList.Add(collectedArguments);
                 continue;
             }
-            if (items[i].StartsWith("\"") && !items[i].EndsWith("\"")) {
+            if (items[i].StartsWith('\"') && !items[i].EndsWith('\"')) {
                 collectedArguments = items[i];
                 isMultiArg = true;
                 continue;
             }
             argsList.Add(items[i]);
         }
-        Args = argsList.ToArray();
+        Args = [.. argsList];
     }
 
     private static readonly Dictionary<string, Command> Commands = new() {
         { "strings", Command.Strings },
         { "intermediary", Command.Intermediary },
-        { "devExe", Command.DevExe },
+        { "devMerge", Command.MergeDev },
         { "merge", Command.Merge },
         { "newMod", Command.NewMod },
         { "copy", Command.Copy },
@@ -163,7 +163,7 @@ public class Task {
 public enum Command {
     Strings,
     Intermediary,
-    DevExe,
+    MergeDev,
     Merge,
     NewMod,
     Copy,

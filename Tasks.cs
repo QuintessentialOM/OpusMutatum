@@ -58,7 +58,7 @@ public static class Tasks {
 
         HandleIntermediary(onlyOnChange);
         Console.WriteLine();
-        HandleQuintDevExe(onlyOnChange);    // TODO don't skip this step when mappings change, add MergeModder.PrePatchAssembly() step.
+        HandleNamed(onlyOnChange);    // TODO don't skip this step when mappings change, add MergeModder.PrePatchAssembly() step.
     }
 
     private static void HandleCoreify(bool onlyOnChange) {
@@ -123,7 +123,7 @@ public static class Tasks {
         Console.WriteLine();
         string[] dllPaths = [.. ModLoader.DllPaths];
 
-        string asmFrom = Path.Combine(Globals.PathToOutput, asNamed ? Globals.PathToQuintDevLightning : Globals.PathToIntermediaryLightning);
+        string asmFrom = Path.Combine(Globals.PathToOutput, asNamed ? Globals.PathToNamedLightning : Globals.PathToIntermediaryLightning);
         string moddedLightningPath = Path.Combine(Globals.PathToOutput, Globals.PathToModdedLightning);
 
         if (onlyOnChange && GuidUtils.SameMvidAssemblies([.. dllPaths, asmFrom], moddedLightningPath)) {
@@ -136,7 +136,7 @@ public static class Tasks {
         Console.WriteLine();
     }
 
-    public static void HandleDevExe(string[] args) {
+    public static void HandleMergeDev(string[] args) {
         bool onlyOnChange = false;
         bool asId = false;
         string modId = "";
@@ -153,13 +153,13 @@ public static class Tasks {
                         asId = true;
                         break;
                     default:
-                        Console.WriteLine($"Invalid Argument '{item}' for 'merge' task.");
+                        Console.WriteLine($"Invalid Argument '{item}' for 'devMerge' task.");
                         break;
                 }
             }
         }
         if (modId == "") {
-            Console.WriteLine("Mod id has to be specified with -id for the 'devExe' task.");
+            Console.WriteLine("Mod id has to be specified with -id for the 'devMerge' task.");
             return;
         }
 
@@ -167,7 +167,7 @@ public static class Tasks {
         Console.WriteLine("Generating development assembly...");
         string[] dllPaths = [.. ModLoader.GetDevMods(modId, [modId, .. Globals.Tasks.DevModIds], true)];
 
-        string asmFrom = Path.Combine(Globals.PathToOutput, Globals.PathToQuintDevLightning);
+        string asmFrom = Path.Combine(Globals.PathToOutput, Globals.PathToNamedLightning);
         string devLightningPath = Path.Combine(Globals.PathToOutput, "DevLightning.dll");
 
         if (onlyOnChange && GuidUtils.SameMvidAssemblies([.. dllPaths, asmFrom], devLightningPath)) {
@@ -179,19 +179,19 @@ public static class Tasks {
         Console.WriteLine();
     }
 
-    public static void HandleQuintDevExe(bool onlyOnChange) {
+    public static void HandleNamed(bool onlyOnChange) {
         // take IntermediaryLightning.exe, remap to named (no merged quintessential)
-        if (onlyOnChange && GuidUtils.SameMvidAssemblies(Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning), Path.Combine(Globals.PathToOutput, Globals.PathToQuintDevLightning))) {
-            Console.WriteLine("Found cache, skipping Quintessential development assembly generation.");
+        if (onlyOnChange && GuidUtils.SameMvidAssemblies(Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning), Path.Combine(Globals.PathToOutput, Globals.PathToNamedLightning))) {
+            Console.WriteLine("Found cache, skipping named assembly generation.");
             return;
         }
         if (!Globals.TryLoadIntermediaryLightning(out AssemblyDefinition intermediaryLightning))
             return;
 
-        Console.WriteLine("Generating Quintessential development assembly...");
+        Console.WriteLine("Generating named assembly...");
         Remapping.RemapToNamed(intermediaryLightning);
 
-        intermediaryLightning.Write(Path.Combine(Globals.PathToOutput, Globals.PathToQuintDevLightning));
+        intermediaryLightning.Write(Path.Combine(Globals.PathToOutput, Globals.PathToNamedLightning));
         Console.WriteLine();
     }
 

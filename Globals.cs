@@ -24,7 +24,7 @@ public static class Globals {
     public static string PathToLightning = "Lightning.dll";
     public static string PathToIntermediaryLightning = "IntermediaryLightning.dll";
     public static string PathToModdedLightning = "ModdedLightning.dll";
-    public static string PathToQuintDevLightning = "QuintDevLightning.dll";
+    public static string PathToNamedLightning = "NamedLightning.dll";
 
     public static MutatumTasks Tasks = null;
 

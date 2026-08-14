@@ -280,6 +280,7 @@ public static class Tasks {
 
         if (Directory.Exists(pathFrom)) {
             string pathWDir = Path.Combine(pathTo, Path.GetFileName(pathFrom));
+            if (!Directory.Exists(pathWDir)) Directory.CreateDirectory(pathWDir);
             Console.WriteLine($"Copying directory: {pathFrom}");
             var allDirectories = Directory.GetDirectories(pathFrom, "*", SearchOption.AllDirectories);
 

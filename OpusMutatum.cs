@@ -20,18 +20,25 @@ public static class OpusMutatum {
     }
 
     private static void Main(string[] args) {
-        HandleArguments(args);
-        Globals.Tasks = TaskParser.ReadTasksFromFile();
+        try {
+            HandleArguments(args);
+            Globals.Tasks = TaskParser.ReadTasksFromFile();
 
-        HandleSetup();
+            HandleSetup();
 
-        foreach (var task in Globals.Tasks.Tasks) {
-            if(RunTask(task)) break;
+            foreach (var task in Globals.Tasks.Tasks) {
+                if(RunTask(task)) break;
+            }
+            Console.WriteLine("Done.");
+            if (!autoExit) Console.ReadKey(); // keep command line open
+
+            HandleCleanup();
+
+        } catch (Exception e) {
+            Console.WriteLine("Error loading tasks:");
+            Console.WriteLine(e.ToString());
+            Console.ReadKey();
         }
-        Console.WriteLine("Done.");
-        if (!autoExit) Console.ReadKey(); // keep command line open
-
-        HandleCleanup();
     }
 
     private static void HandleArguments(string[] args) {

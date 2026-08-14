@@ -10,7 +10,6 @@ using System.Linq;
 namespace OpusMutatum.Merging;
 public static class MethodGeneration {
     static readonly string GeneratedClassName = "<>mut";
-    static readonly string PathToCoreLib = "System.Private.CoreLib.dll";
 
     #region generation
     public static TypeDefinition GetCompilerGeneratedType(this TypeDefinition targetType) {
@@ -29,7 +28,6 @@ public static class MethodGeneration {
     }
     public static FieldReference GetCompilerGeneratedFuncField(this TypeDefinition targetType, MethodDefinition method) {
         if (!method.IsStatic) throw new Exception("GetCompilerGeneratedFuncField must use a static method.");
-        TryLoadCoreLib(out AssemblyDefinition coreLibAssemblyDef);
         var compilerType = targetType.GetCompilerGeneratedType();
         var cctor = GetCctor(compilerType);
         var funcCtor = method.GetFuncCtor();
@@ -64,11 +62,11 @@ public static class MethodGeneration {
         return GetFuncCtor(toFunct.ReturnType, [.. toFunct.Parameters.Select(par => par.ParameterType)]);
     }
     public static MethodReference GetFuncCtor(TypeReference returnType, TypeReference[] paramTypes) {
-        TryLoadCoreLib(out AssemblyDefinition coreLibAssemblyDef);
+        var coreLibModule = returnType.Module.ImportReference(typeof(Action)).Resolve().Module;
         bool isAction = returnType.FullName == "System.Void";
-
-        var functType = isAction ? coreLibAssemblyDef.MainModule.GetType("System.Action" + (paramTypes.Length > 0 ? "`" + paramTypes.Length : ""))
-                                 : coreLibAssemblyDef.MainModule.GetType("System.Func`" + (1 + paramTypes.Length));
+        
+        var functType = isAction ? coreLibModule.GetType("System.Action" + (paramTypes.Length > 0 ? "`" + paramTypes.Length : ""))
+                                 : coreLibModule.GetType("System.Func`" + (1 + paramTypes.Length));
         var ctorMethod = (MethodReference)functType.FindMethodByName(methodName: ".ctor").Clone();
 
         var genericInstanceType = new GenericInstanceType(functType);
@@ -80,20 +78,20 @@ public static class MethodGeneration {
     }
 
     public static TypeReference GetVoidRef() {
-        TryLoadCoreLib(out AssemblyDefinition coreLibAssemblyDef);
-        return coreLibAssemblyDef.MainModule.TypeSystem.Void;
+        Globals.TryLoadIntermediaryLightning(out AssemblyDefinition assembly, logConsoleNormal: false); // Any assembly on .Net 10 should do
+        return assembly.MainModule.TypeSystem.Void;
     }
     public static TypeReference GetIntRef() {
-        TryLoadCoreLib(out AssemblyDefinition coreLibAssemblyDef);
-        return coreLibAssemblyDef.MainModule.TypeSystem.Int32;
+        Globals.TryLoadIntermediaryLightning(out AssemblyDefinition assembly, logConsoleNormal: false);
+        return assembly.MainModule.TypeSystem.Int32;
     }
     public static TypeReference GetUIntRef() {
-        TryLoadCoreLib(out AssemblyDefinition coreLibAssemblyDef);
-        return coreLibAssemblyDef.MainModule.TypeSystem.UInt32;
+        Globals.TryLoadIntermediaryLightning(out AssemblyDefinition assembly, logConsoleNormal: false);
+        return assembly.MainModule.TypeSystem.UInt32;
     }
     public static TypeReference GetBoolRef() {
-        TryLoadCoreLib(out AssemblyDefinition coreLibAssemblyDef);
-        return coreLibAssemblyDef.MainModule.TypeSystem.Boolean;
+        Globals.TryLoadIntermediaryLightning(out AssemblyDefinition assembly, logConsoleNormal: false);
+        return assembly.MainModule.TypeSystem.Boolean;
     }
     #endregion
 
@@ -111,9 +109,6 @@ public static class MethodGeneration {
         }
         return cursor;
     }
-
-    public static bool TryLoadCoreLib(out AssemblyDefinition coreLibAssemblyDef)
-        => Globals.TryLoadAssemblyDef(PathToCoreLib, out coreLibAssemblyDef, logConsoleNormal: false);
 
     public static ILCursor EmitLdargOptimised(this ILCursor cursor, int i) {
         return i switch {

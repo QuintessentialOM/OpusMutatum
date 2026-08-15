@@ -63,7 +63,7 @@ public class MergeModder : MonoModder {
             if (IsPatchType(type)) {
                 foreach (var method in type.Methods) {
                     if (method.GetCustomAttribute("MonoMod.MonoModILInject") is CustomAttribute ILInject) {
-                        ExecutionManager.ReadMethod(method, "test");    // TODO replace "test" with mod_id;
+                        ExecutionManager.ReadMethod(type, method, "test");    // TODO replace "test" with mod_id;
                     }
                 }
             }
@@ -75,14 +75,14 @@ public class MergeModder : MonoModder {
     public override void PatchModule(ModuleDefinition mod) {
         base.PatchModule(mod);
 
-        Stash.ApplyAllILInjectors(this);
+        Stash.ApplyAllILInjectors();
         Stash.ApplyAllWrapOperations();
     }
 
     public override MethodDefinition PatchMethod(TypeDefinition targetType, MethodDefinition method) {
 
         if (method.GetCustomAttribute("MonoMod.MonoModILInject") is CustomAttribute injectAtrib && injectAtrib != null) {
-            Stash.PushILInjector(injectAtrib, targetType, method, "test");    // TODO replace "test" with mod_id;
+            Stash.PushILInjector(injectAtrib, targetType, method.Name, method.DeclaringType.Name, "test");    // TODO replace "test" with mod_id;
             return null;
         }
 

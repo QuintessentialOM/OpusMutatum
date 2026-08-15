@@ -13,7 +13,7 @@ using static System.Reflection.BindingFlags;
 namespace OpusMutatum.Merging;
 public class CodeExecutionManager {
     private readonly MergeModder MergeModder;
-    readonly Dictionary<string, Dictionary<string, System.Reflection.MethodInfo>> CompiledMethods = [];
+    readonly Dictionary<string, Dictionary<string, Dictionary<string, System.Reflection.MethodInfo>>> CompiledMethods = [];
     TypeDefinition RuntimeCompiledTypeDef;
 
     public CodeExecutionManager(MergeModder mergeModder) {
@@ -26,9 +26,9 @@ public class CodeExecutionManager {
         };
     }
 
-    public void ReadMethod(MethodDefinition method, string nestedClassName) {
+    public void ReadMethod(TypeDefinition type, MethodDefinition method, string modClassName) {
         if (!method.IsStatic) throw new Exception("Only static methods can be executed by Mutatum.");
-        var nested = RuntimeCompiledTypeDef.GetCompilerGeneratedType(nestedClassName, false);
+        var nested = RuntimeCompiledTypeDef.GetCompilerGeneratedType(modClassName, false).GetCompilerGeneratedType("<"+ type.Name + ">", false);
 
         var copy = new MethodDefinition(method.Name, method.Attributes, method.ReturnType) {
             Body = method.Body,
@@ -41,6 +41,7 @@ public class CodeExecutionManager {
         var origGeneratedType = method.DeclaringType.NestedTypes.Where(type => type.Name == "<>c").SingleOrNull();
         var generatedType = nested.GetCompilerGeneratedType("<>c", false);
         CopyCompileGeneratedType(origGeneratedType, generatedType, method.Name);
+        CopyDisplayClasses(nested, method);
 
 
         nested.Methods.Add(copy);
@@ -96,10 +97,37 @@ public class CodeExecutionManager {
             fieldDef.CustomAttributes.Add(new CustomAttribute(MergeModder.GetMonoModNoNewCtor()));
         }
     }
-    public System.Reflection.MethodInfo GetExecutingMethod(string methodName, string nestedClassName) {
-        if (CompiledMethods.TryGetValue(nestedClassName, out var typeMethods)) {
-            if (typeMethods.TryGetValue(methodName, out var method)) {
-                return method;
+    private void CopyDisplayClasses(TypeDefinition declaringType, MethodDefinition method) {
+        foreach (var nestedType in method.DeclaringType.NestedTypes) {
+            if (nestedType.Name.StartsWith("<>c__DisplayClass")) {
+                if (nestedType.Methods.Any(method2 => method2.Name.StartsWith("<" + method.Name + ">"))) {
+                    var displayClassDef = new TypeDefinition("", nestedType.Name, nestedType.Attributes) {
+                        BaseType = nestedType.BaseType,
+                        DeclaringType = declaringType
+                    };
+                    foreach (var m in nestedType.Methods) {
+                        var mC = m.Clone();
+                        mC.DeclaringType = displayClassDef;
+                        displayClassDef.Methods.Add(mC);
+                    }
+                    foreach (var f in nestedType.Fields) {
+                        f.DeclaringType = displayClassDef;
+                        displayClassDef.Fields.Add(f);
+                    }
+                    nestedType.CustomAttributes.Add(new CustomAttribute(MergeModder.GetMonoModIgnoreCtor()));
+                    nestedType.CustomAttributes.Add(new CustomAttribute(MergeModder.GetMonoModNoNewCtor()));
+                    declaringType.NestedTypes.Add(displayClassDef);
+                }
+            }
+        }
+    }
+
+    public System.Reflection.MethodInfo GetExecutingMethod(string methodName, string patchTypeName, string modClassName) {
+        if (CompiledMethods.TryGetValue(modClassName, out var patchTypeMethods)) {
+            if (patchTypeMethods.TryGetValue("<" + patchTypeName + ">", out var typeMethods)) {
+                if (typeMethods.TryGetValue(methodName, out var method)) {
+                    return method;
+                }
             }
         }
         return null;
@@ -118,12 +146,16 @@ public class CodeExecutionManager {
                 IsSpecialName = true
             };
 
-            foreach (var type in runtimeCompiledType.GetNestedTypes()) {
-                Dictionary<string, System.Reflection.MethodInfo> typeMethods = [];
-                foreach (var method in type.GetMethods(Static | NonPublic | Public | DeclaredOnly)) {
-                    typeMethods.Add(method.Name, method);
+            foreach (var modType in runtimeCompiledType.GetNestedTypes()) {
+                Dictionary<string, Dictionary<string, System.Reflection.MethodInfo>> modTypes = [];
+                foreach (var type in modType.GetNestedTypes()) {
+                    Dictionary<string, System.Reflection.MethodInfo> patchTypes = [];
+                    foreach (var method in type.GetMethods(Static | NonPublic | Public | DeclaredOnly)) {
+                        patchTypes.Add(method.Name, method);
+                    }
+                    modTypes.Add(type.Name, patchTypes);
                 }
-                CompiledMethods.Add(type.Name, typeMethods);
+                CompiledMethods.Add(modType.Name, modTypes);
             }
         }
     }
@@ -179,9 +211,9 @@ public class CodeExecutionManager {
             asm = ReflectionHelper.Load(asmStream);
         }
 
-        //using (FileStream debugStream = File.OpenWrite(Path.Combine(
-        //    self.DependencyDirs[0], $"{orig.Module.Name.Substring(0, orig.Module.Name.Length - 4)}.MonoModRules-MMILRT.dll")))
-        //    wrapperMod.Write(debugStream);
+        using (FileStream debugStream = File.OpenWrite(Path.Combine(
+            self.DependencyDirs[0], $"{orig.Module.Name.Substring(0, orig.Module.Name.Length - 4)}.MonoModRules-MMILRT.dll")))
+            wrapperMod.Write(debugStream);
 
         self.MissingDependencyThrow = missingDependencyThrow;
 
@@ -206,11 +238,16 @@ public class CodeExecutionManager {
                 for (; origType != null; origType = origType.DeclaringType)
                     if (origType == Orig)
                         return Module.GetType(typeRef.FullName);
+
             if (mtp is TypeDefinition typeDef && mtp.ToString().StartsWith("patch_") && mtp.ToString().EndsWith("<>c") && context is MethodDefinition methodDef) {
                 return methodDef.DeclaringType.NestedTypes.Where(type => type.Name == "<>c").Single();
             }
             if (mtp is TypeDefinition typeDef2 && mtp.ToString().StartsWith("patch_") && mtp.ToString().EndsWith("<>c") && context is TypeDefinition typeDef3 && context.ToString().EndsWith("<>c")) {
                 return typeDef3;
+            }
+
+            if (mtp is TypeDefinition displayClass && displayClass.Name.StartsWith("<>c__DisplayClass") && context is MethodDefinition methodDef2) {
+                return methodDef2.DeclaringType.NestedTypes.Single(type => type.Name == displayClass.Name);
             }
 
             return base.Relinker(mtp, context);

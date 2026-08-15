@@ -2,24 +2,15 @@ using Mono.Cecil;
 using System;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 
-namespace OpusMutatum;
+namespace OpusMutatum.Merging;
 
 public static class Patching {
-    public static string PathToMonoMod = "MonoMod.Patcher.dll";
+    public static string PathToQuintessential = "Quintessential.dll";
     public static string PathToPatchingDependencies = "";
 
-    public static string PathToQuintessential = "Quintessential.dll";
 
-    private static bool TryLoadMonoMod(out Assembly monoModAssembly)
-        => Globals.TryLoadAssembly(PathToMonoMod, out monoModAssembly);
-
-    public static void RunMonoMod(string asmFrom, string asmTo = null, string[] dllPaths = null, bool mergeDllMvids = false) {
-        if (!TryLoadMonoMod(out Assembly monoModAssembly)) {
-            Console.WriteLine("Unable to load MonoMod, skipping patching!");
-            return;
-        }
+    public static void RunMerge(string asmFrom, string asmTo = null, string[] dllPaths = null, bool mergeDllMvids = false) {
 
         asmTo ??= asmFrom;
         dllPaths ??= [];
@@ -31,13 +22,8 @@ public static class Patching {
             Environment.SetEnvironmentVariable("MONOMOD_DEPDIRS", PathToPatchingDependencies);
             Environment.SetEnvironmentVariable("MONOMOD_DEPENDENCY_MISSING_THROW", "0");
 
-            string[] args = Enumerable.Repeat(asmFrom, 1).Concat(dllPaths).Append(asmTmp).ToArray();
-            int returnCode = (int) monoModAssembly.EntryPoint!.Invoke(null, [args])!;
-            if (returnCode != 0)
-                File.Delete(asmTmp);
+            RunMergeModder(asmFrom, asmTmp, dllPaths);
 
-            if (!File.Exists(asmTmp))
-                throw new Exception($"MonoMod failed to create a patched assembly: exit code {returnCode}!");
             if (mergeDllMvids) {
                 string asmTmp2 = Path.Combine(Globals.PathToTemporaryOutput, "2_" + Path.GetFileName(asmTo));
                 using var def = AssemblyDefinition.ReadAssembly(asmTmp);
@@ -51,6 +37,31 @@ public static class Patching {
             File.Delete(asmTmp);
             File.Delete(Path.ChangeExtension(asmTmp, "pdb"));
             File.Delete(Path.ChangeExtension(asmTmp, "mdb"));
+        }
+    }
+    public static void RunMergeModder(string asmFrom, string asmTo, string[] dllPaths = null) {
+        try {
+
+            using (MergeModder modder = new() {
+                InputPath = asmFrom,
+                OutputPath = asmTo,
+                MissingDependencyThrow = false,
+                LogVerboseEnabled = false
+            }) {
+                modder.Read();
+                foreach (var mod in dllPaths)
+                    modder.ReadMod(mod);
+
+                modder.MapDependencies();
+                modder.Log("[Main] Begin patching.");
+                modder.PrePatchAssembly();
+                modder.AutoPatch();
+                modder.Write(null, null);
+                modder.Log("[Main] Done.");
+            }
+        } catch {
+            if (File.Exists(asmTo) && asmTo != asmFrom) File.Delete(asmTo);
+            throw;
         }
     }
 }

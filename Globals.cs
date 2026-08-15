@@ -57,12 +57,12 @@ public static class Globals {
         return true;
     }
 
-    public static bool TryLoadAssemblyDef(string path, out AssemblyDefinition assemblyDef) {
+    public static bool TryLoadAssemblyDef(string path, out AssemblyDefinition assemblyDef, bool logConsoleNormal = true) {
         assemblyDef = null;
         string filename = Path.GetFileName(path);
 
         if (CachedAssemblyDefs.TryGetValue(path, out assemblyDef)) {
-            Console.WriteLine($"Loaded {filename} from cache.");
+            if (logConsoleNormal) Console.WriteLine($"Loaded {filename} from cache.");
             return true;
         }
 
@@ -71,7 +71,7 @@ public static class Globals {
             return false;
         }
 
-        Console.WriteLine($"Reading {filename}...");
+        if (logConsoleNormal) Console.WriteLine($"Reading {filename}...");
         try {
             CachedAssemblyDefs[path] = assemblyDef = AssemblyDefinition.ReadAssembly(path)
                 ?? throw new Exception("Failed to read assembly definition.");
@@ -80,7 +80,7 @@ public static class Globals {
             return false;
         }
 
-        Console.WriteLine($"Found {filename}: {assemblyDef!.FullName}");
+        if (logConsoleNormal) Console.WriteLine($"Found {filename}: {assemblyDef!.FullName}");
         return true;
     }
 
@@ -89,8 +89,8 @@ public static class Globals {
 
     public static bool TryLoadLightning(out AssemblyDefinition lightningAssemblyDef)
         => TryLoadAssemblyDef(Path.Combine(PathToOutput, PathToLightning), out lightningAssemblyDef);
-    public static bool TryLoadIntermediaryLightning(out AssemblyDefinition intermediaryLightningAssemblyDef)
-        => TryLoadAssemblyDef(Path.Combine(PathToOutput, PathToIntermediaryLightning), out intermediaryLightningAssemblyDef);
+    public static bool TryLoadIntermediaryLightning(out AssemblyDefinition intermediaryLightningAssemblyDef, bool logConsoleNormal = true)
+        => TryLoadAssemblyDef(Path.Combine(PathToOutput, PathToIntermediaryLightning), out intermediaryLightningAssemblyDef, logConsoleNormal);
     public static bool TryLoadModdedLightning(out AssemblyDefinition moddedLightningAssemblyDef)
         => TryLoadAssemblyDef(Path.Combine(PathToOutput, PathToModdedLightning), out moddedLightningAssemblyDef);
 
@@ -114,6 +114,7 @@ public static class Globals {
         startInfo.UseShellExecute = false;
 
         Process process = new() { StartInfo = startInfo };
+        debugger?.BeforeProcessStart();
         process.Start();
         debugger?.HandleRunningProcess(process);
         process.WaitForExit();

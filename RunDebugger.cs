@@ -5,29 +5,43 @@ using System.Threading;
 
 namespace OpusMutatum;
 public class RunDebugger {
+    private const int logReadRetries = 4;
+
     public string[] runArgs = [];
     public bool readLogs = false;
     public bool attachDebugger = false; // TODO: Find ways to attach VS and VSCode debuggers (optionaly ILSpy and dnSpy)
 
-    public void HandleRunningProcess(Process p) {
-
-        AsyncStreamRedirector gameLog = null;
+    public void BeforeProcessStart() {
         if (readLogs && File.Exists(Path.Combine(Globals.PathToOutput, "log.txt"))) {
-            Thread.Sleep(1000); // Sleeping to avoid crashing the game by reading log.txt before the game opens the file. TODO: actually wait for file to be open
-            try {
-                FileStream logStream = new FileStream(Path.Combine(Globals.PathToOutput, "log.txt"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                if (logStream != null && logStream.CanRead) {
-                    Console.WriteLine();
-                    Console.WriteLine("Reading Logs:");
-                    gameLog = new AsyncStreamRedirector(logStream, Console.OpenStandardOutput(), false);
-                }
-
-            } catch (Exception e) {
-                Console.WriteLine();
-                Console.WriteLine("Failed to read logs:");
-                Console.WriteLine(e.ToString());
-            }
+            File.Delete(Path.Combine(Globals.PathToOutput, "log.txt"));
         }
+    }
+    public void HandleRunningProcess(Process p) {
+        AsyncStreamRedirector gameLog = null;
+
+        var task = System.Threading.Tasks.Task.Run(async () => {
+            if (readLogs) {
+                for (int i = 0; i < logReadRetries; i++) {
+                    Thread.Sleep(1000); // Sleeping to avoid crashing the game by reading log.txt before the game opens the file. TODO: actually wait for file to be open
+                    if (File.Exists(Path.Combine(Globals.PathToOutput, "log.txt"))) {
+                        try {
+                            FileStream logStream = new FileStream(Path.Combine(Globals.PathToOutput, "log.txt"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                            if (logStream != null && logStream.CanRead) {
+                                Console.WriteLine();
+                                Console.WriteLine("Reading Logs:");
+                                gameLog = new AsyncStreamRedirector(logStream, Console.OpenStandardOutput(), false);
+                            }
+
+                        } catch (Exception e) {
+                            Console.WriteLine();
+                            Console.WriteLine("Failed to read logs:");
+                            Console.WriteLine(e.ToString());
+                        }
+                        break;
+                    }
+                }
+            }
+        });
     }
 
     // Based on https://gist.github.com/antopor/5515bed636c3d99395ea

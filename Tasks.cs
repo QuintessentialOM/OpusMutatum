@@ -1,8 +1,7 @@
 ﻿using Mono.Cecil;
+using OpusMutatum.Merging;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Text;
 
 namespace OpusMutatum;
 public static class Tasks {
@@ -79,7 +78,6 @@ public static class Tasks {
     }
 
     private static void HandleDependencies() {
-        // TODO: add caching
         Console.WriteLine("Setting up native libraries...");
         DependencyHandling.SetupNativeLibs();
 
@@ -87,7 +85,7 @@ public static class Tasks {
         ContentHandling.CreateContentSymlinks();
 
         Console.WriteLine();
-    }
+    } // TODO: add caching
 
     private static void HandleIntermediary(bool onlyOnChange) {
         // TODO: MonoMod relinking?
@@ -140,7 +138,7 @@ public static class Tasks {
         }
 
         Console.WriteLine($"Merging {quintessentialFilename}...");
-        Patching.RunMonoMod(asNamed ? quintDevLightningPath : intermediaryLightningPath, moddedLightningPath, dllPaths: [quintessentialPath], true);
+        Patching.RunMerge(asNamed ? quintDevLightningPath : intermediaryLightningPath, moddedLightningPath, dllPaths: [quintessentialPath], true);
 
         Console.WriteLine();
     }
@@ -258,6 +256,7 @@ public static class Tasks {
 
         if (Directory.Exists(pathFrom)) {
             string pathWDir = Path.Combine(pathTo, Path.GetFileName(pathFrom));
+            if (!Directory.Exists(pathWDir)) Directory.CreateDirectory(pathWDir);
             Console.WriteLine($"Copying directory: {pathFrom}");
             var allDirectories = Directory.GetDirectories(pathFrom, "*", SearchOption.AllDirectories);
 

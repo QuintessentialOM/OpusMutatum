@@ -1,7 +1,7 @@
-﻿using System;
+﻿using OpusMutatum.Merging;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using AssemblyDefinition = Mono.Cecil.AssemblyDefinition;
 
 namespace OpusMutatum;
 
@@ -20,18 +20,25 @@ public static class OpusMutatum {
     }
 
     private static void Main(string[] args) {
-        HandleArguments(args);
-        Globals.Tasks = TaskParser.ReadTasksFromFile();
+        try {
+            HandleArguments(args);
+            Globals.Tasks = TaskParser.ReadTasksFromFile();
 
-        HandleSetup();
+            HandleSetup();
 
-        foreach (var task in Globals.Tasks.Tasks) {
-            RunTask(task);
+            foreach (var task in Globals.Tasks.Tasks) {
+                if(RunTask(task)) break;
+            }
+            Console.WriteLine("Done.");
+            if (!autoExit) Console.ReadKey(); // keep command line open
+
+            HandleCleanup();
+
+        } catch (Exception e) {
+            Console.WriteLine("Error loading tasks:");
+            Console.WriteLine(e.ToString());
+            Console.ReadKey();
         }
-        Console.WriteLine("Done.");
-        if (!autoExit) Console.ReadKey(); // keep command line open
-
-        HandleCleanup();
     }
 
     private static void HandleArguments(string[] args) {
@@ -104,7 +111,7 @@ public static class OpusMutatum {
         Remapping.LoadMappingsPaths(extraIntermediaryMappingPaths, extraNamedMappingPaths);
     }
 
-    private static void RunTask(Task task) {
+    private static bool RunTask(Task task) {
         try {
             switch (task.Command) {
                 case Command.Strings:
@@ -132,14 +139,15 @@ public static class OpusMutatum {
         } catch (Exception e) {
             Console.WriteLine("Error executing task:");
             Console.WriteLine(e.ToString());
+            return true;
         }
+        return false;
     }
 
     private static void HandleSetup() {
         Globals.PathToOutput = Globals.Tasks.GameDir;
         Globals.PathToTemporaryOutput = Path.Combine(Globals.Tasks.GameDir, "temp");
         Remapping.PathToMappings = Globals.Tasks.MappingsDir;
-        //tasks.modsDir
 
         autoExit = Globals.Tasks.AutoExit || autoExit;
 

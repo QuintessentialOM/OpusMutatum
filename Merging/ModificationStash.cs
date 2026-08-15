@@ -8,27 +8,27 @@ using static OpusMutatum.Merging.OperationWrapper;
 namespace OpusMutatum.Merging;
 
 public class ModificationStash(MethodLayerTable layerTable, CodeExecutionManager executionManager) {
-    private record ILInjector(CustomAttribute atrib, TypeDefinition targetType, MethodDefinition ILMethod, string modId);
+    private record ILInjector(CustomAttribute atrib, TypeDefinition targetType, string methodName, string patchTypeName, string modId);
     readonly List<ILInjector> ILInjectors = [];
     private record WrapOperation(TypeDefinition targetType, MethodDefinition method, string targetMethodName, WrapOperationNameData nameData, string callMetadata, int layer);
     readonly Dictionary<string, List<WrapOperation>> WrapOperations = [];
 
-    public void PushILInjector(CustomAttribute atrib, TypeDefinition targetType, MethodDefinition ILMethod, string modId) {
-        ILInjectors.Add(new(atrib, targetType, ILMethod, modId));
+    public void PushILInjector(CustomAttribute atrib, TypeDefinition targetType, string methodName, string patchTypeName, string modId) {
+        ILInjectors.Add(new(atrib, targetType, methodName, patchTypeName, modId));
     }
     public void PushWrapOperation(TypeDefinition targetType, MethodDefinition method, string targetMethodName, WrapOperationNameData nameData, string callMetadata, int layer, string type) {
         if (!WrapOperations.ContainsKey(type)) WrapOperations[type] = [];
         WrapOperations[type].Add(new(targetType, method, targetMethodName, nameData, callMetadata, layer));
     }
 
-    public void ApplyAllILInjectors(MonoModder modder) {
+    public void ApplyAllILInjectors() {
         foreach (var injector in ILInjectors) {
 
             var origTargetMethodName = (string)injector.atrib.ConstructorArguments[0].Value;
             string targetMethodName = layerTable.TransformOriginalMethodName(origTargetMethodName, injector.targetType.GetPatchFullName());
             var modifiedMethod = injector.targetType.FindMethodByName(targetMethodName);
 
-            var injectorMethod = executionManager.GetExecutingMethod(injector.ILMethod.Name, injector.modId);
+            var injectorMethod = executionManager.GetExecutingMethod(injector.methodName, injector.patchTypeName, injector.modId);
             injectorMethod?.Invoke(null, [modifiedMethod, injector.atrib]);
             modifiedMethod.CustomAttributes.Add(injector.atrib.Clone()); //Why doesn't the attribute appear in the decompiled code? TODO: make it appear!?
         }

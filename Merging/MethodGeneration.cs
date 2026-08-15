@@ -12,18 +12,20 @@ public static class MethodGeneration {
     static readonly string GeneratedClassName = "<>mut";
 
     #region generation
-    public static TypeDefinition GetCompilerGeneratedType(this TypeDefinition targetType) {
-        var generated = targetType.NestedTypes.FirstOrDefault(typeDef => typeDef.Name == GeneratedClassName, defaultValue: null);
+    public static TypeDefinition GetCompilerGeneratedType(this TypeDefinition targetType, string generatedTypeName = null, bool addCctor = true) {
+        generatedTypeName ??= GeneratedClassName;
+        var generated = targetType.NestedTypes.FirstOrDefault(typeDef => typeDef.Name == generatedTypeName, defaultValue: null);
         if (generated != null) return generated;
 
-        generated = new TypeDefinition(targetType.Namespace, GeneratedClassName, TypeAttributes.NestedPublic | TypeAttributes.Sealed);
-        generated.DeclaringType = targetType;
-        generated.BaseType = targetType.Module.TypeSystem.Object;
-        generated.IsClass = true;
-        generated.IsSpecialName = true;
+        generated = new TypeDefinition(targetType.Namespace, generatedTypeName, TypeAttributes.NestedPublic | TypeAttributes.Sealed) {
+            DeclaringType = targetType,
+            BaseType = GetObjectRef(),
+            IsClass = true,
+            IsSpecialName = true
+        };
 
         targetType.NestedTypes.Add(generated);
-        generated.GetCctor(); // Just to generate the .cctor as the first method;
+        if (addCctor) generated.GetCctor(); // Just to generate the .cctor as the first method;
         return generated;
     }
     public static FieldReference GetCompilerGeneratedFuncField(this TypeDefinition targetType, MethodDefinition method) {
@@ -92,6 +94,10 @@ public static class MethodGeneration {
     public static TypeReference GetBoolRef() {
         Globals.TryLoadIntermediaryLightning(out AssemblyDefinition assembly, logConsoleNormal: false);
         return assembly.MainModule.TypeSystem.Boolean;
+    }
+    public static TypeReference GetObjectRef() {
+        Globals.TryLoadIntermediaryLightning(out AssemblyDefinition assembly, logConsoleNormal: false);
+        return assembly.MainModule.TypeSystem.Object;
     }
     #endregion
 

@@ -2,6 +2,7 @@
 using Mono.Cecil.Cil;
 using Mono.Collections.Generic;
 using MonoMod;
+using MonoMod.InlineRT;
 using MonoMod.Utils;
 using OpusMutatum;
 using System;
@@ -14,10 +15,12 @@ public class MergeModder : MonoModder {
     public readonly MethodLayerTable LayerTable;
     public readonly ModificationStash Stash;
     public readonly OperationWrapper OpWrapper;
+    public readonly CodeExecutionManager ExecutionManager;
 
     public MergeModder() {
         LayerTable = new();
-        Stash = new(LayerTable);
+        ExecutionManager = new(this);
+        Stash = new(LayerTable, ExecutionManager);
         OpWrapper = new(Stash);
     }
 
@@ -25,6 +28,49 @@ public class MergeModder : MonoModder {
         Console.WriteLine($"[{LogID}] {text}");
     }
     public override void LogVerbose(string text) { }
+
+    public override void AutoPatch() {
+        Log("[AutoPatch] Parsing rules in loaded mods");
+        foreach (ModuleDefinition mod4 in Mods) {
+            ParseRules(mod4);
+        }
+        ExecutionManager.Compile();
+        Log("[AutoPatch] PrePatch pass");
+        foreach (ModuleDefinition mod5 in Mods) {
+            PrePatchModule(mod5);
+        }
+        Log("[AutoPatch] Patch pass");
+        foreach (ModuleDefinition mod6 in Mods) {
+            PatchModule(mod6);
+        }
+        Log("[AutoPatch] PatchRefs pass");
+        PatchRefs();
+        if (PostProcessors != null) {
+            Delegate[] invocationList = PostProcessors.GetInvocationList();
+            for (int i = 0; i < invocationList.Length; i++) {
+                Log($"[PostProcessor] PostProcessor pass #{i + 1}");
+                ((PostProcessor)invocationList[i])?.Invoke(this);
+            }
+        }
+    }
+
+
+    static bool IsPatchType(TypeDefinition type) =>
+        type.Name.StartsWith("patch_", StringComparison.Ordinal) || type.GetCustomAttribute("MonoMod.MonoModPatch") != null;
+    public override void ParseRules(ModuleDefinition mod) {
+        // Parse Custom defined rules ILInjectors
+        foreach (TypeDefinition type in mod.Types) {
+            if (IsPatchType(type)) {
+                foreach (var method in type.Methods) {
+                    if (method.GetCustomAttribute("MonoMod.MonoModILInject") is CustomAttribute ILInject) {
+                        ExecutionManager.ReadMethod(method, "test");    // TODO replace "test" with mod_id;
+                    }
+                }
+            }
+        }
+        base.ParseRules(mod);
+    }
+
 
     public override void PatchModule(ModuleDefinition mod) {
         base.PatchModule(mod);
@@ -34,6 +80,12 @@ public class MergeModder : MonoModder {
     }
 
     public override MethodDefinition PatchMethod(TypeDefinition targetType, MethodDefinition method) {
+
+        if (method.GetCustomAttribute("MonoMod.MonoModILInject") is CustomAttribute injectAtrib && injectAtrib != null) {
+            Stash.PushILInjector(injectAtrib, targetType, method, "test");    // TODO replace "test" with mod_id;
+            return null;
+        }
+
         if (method.Name.StartsWith("orig_", StringComparison.Ordinal) || method.HasCustomAttribute("MonoMod.MonoModOriginal"))
             // Ignore original method stubs
             return null;
@@ -72,7 +124,7 @@ public class MergeModder : MonoModder {
         MethodDefinition existingMethod = targetType.FindMethod(method.GetID(type: typeName));
         MethodDefinition origMethod = null;
 
-        if (method.HasCustomAttribute("MonoMod.MonoModIgnore") && !method.HasCustomAttribute("MonoMod.MonoModILInject")) {
+        if (method.HasCustomAttribute("MonoMod.MonoModIgnore")) {
             // MonoModIgnore is a special case, as registered custom attributes should still be applied.
             if (existingMethod != null)
                 foreach (CustomAttribute attrib in method.CustomAttributes)
@@ -89,12 +141,6 @@ public class MergeModder : MonoModder {
             if (existingMethod != null)
                 targetType.Methods.Remove(existingMethod);
             return null;
-        }
-
-        if (method.GetCustomAttribute("MonoMod.MonoModILInject") is CustomAttribute injectAtrib && injectAtrib != null) {
-            Stash.PushILInjector(injectAtrib, method, targetType);
-            if (method.HasCustomAttribute("MonoMod.MonoModIgnore") || method.Body.CodeSize <= 2) // Return if method only contains 'nop' then 'ret' too.
-                return null;
         }
 
         if (method.HasCustomAttribute("MonoMod.MonoModReplace")) {
@@ -213,4 +259,81 @@ public class MergeModder : MonoModder {
                 item.IsSealed = false;
         }
     }
+
+
+    public virtual MethodReference GetMonoModIgnoreCtor() {
+        if (_mmIgnoreCtor != null && _mmIgnoreCtor.Module != Module) {
+            _mmIgnoreCtor = null;
+        }
+        if (_mmIgnoreCtor != null) {
+            return _mmIgnoreCtor;
+        }
+        TypeDefinition typeDefinition = null;
+        for (int i = 0; i < Module.Types.Count; i++) {
+            if (!(Module.Types[i].Namespace == "MonoMod") || !(Module.Types[i].Name == "MonoModIgnore")) {
+                continue;
+            }
+            typeDefinition = Module.Types[i];
+            for (int j = 0; j < typeDefinition.Methods.Count; j++) {
+                if (typeDefinition.Methods[j].IsConstructor && !typeDefinition.Methods[j].IsStatic) {
+                    return _mmIgnoreCtor = typeDefinition.Methods[j];
+                }
+            }
+        }
+        LogVerbose("[MonoModIgnore] Adding MonoMod.MonoModIgnore");
+        TypeReference typeReference = FindType("System.Attribute");
+        typeReference = ((typeReference == null) ? Module.ImportReference(typeof(Attribute)) : Module.ImportReference(typeReference));
+        typeDefinition = typeDefinition ?? new TypeDefinition("MonoMod", "MonoModIgnore", TypeAttributes.Public) {
+            BaseType = typeReference
+        };
+        _mmIgnoreCtor = new MethodDefinition(".ctor", MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName, Module.TypeSystem.Void);
+        _mmIgnoreCtor.MetadataToken = GetMetadataToken(TokenType.Method);
+        _mmIgnoreCtor.Body.Instructions.Add(Instruction.Create(OpCodes.Ldarg_0));
+        _mmIgnoreCtor.Body.Instructions.Add(Instruction.Create(OpCodes.Call, new MethodReference(".ctor", Module.TypeSystem.Void, typeReference) {
+            HasThis = false
+        }));
+        _mmIgnoreCtor.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
+        typeDefinition.Methods.Add(_mmIgnoreCtor);
+        Module.Types.Add(typeDefinition);
+        return _mmIgnoreCtor;
+    }
+    public virtual MethodReference GetMonoModNoNewCtor() {
+        if (_mmNoNewCtor != null && _mmNoNewCtor.Module != Module) {
+            _mmNoNewCtor = null;
+        }
+        if (_mmNoNewCtor != null) {
+            return _mmNoNewCtor;
+        }
+        TypeDefinition typeDefinition = null;
+        for (int i = 0; i < Module.Types.Count; i++) {
+            if (!(Module.Types[i].Namespace == "MonoMod") || !(Module.Types[i].Name == "MonoModNoNew")) {
+                continue;
+            }
+            typeDefinition = Module.Types[i];
+            for (int j = 0; j < typeDefinition.Methods.Count; j++) {
+                if (typeDefinition.Methods[j].IsConstructor && !typeDefinition.Methods[j].IsStatic) {
+                    return _mmNoNewCtor = typeDefinition.Methods[j];
+                }
+            }
+        }
+        LogVerbose("[MonoModNoNew] Adding MonoMod.MonoModNoNew");
+        TypeReference typeReference = FindType("System.Attribute");
+        typeReference = ((typeReference == null) ? Module.ImportReference(typeof(Attribute)) : Module.ImportReference(typeReference));
+        typeDefinition = typeDefinition ?? new TypeDefinition("MonoMod", "MonoModNoNew", TypeAttributes.Public) {
+            BaseType = typeReference
+        };
+        _mmNoNewCtor = new MethodDefinition(".ctor", MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName, Module.TypeSystem.Void);
+        _mmNoNewCtor.MetadataToken = GetMetadataToken(TokenType.Method);
+        _mmNoNewCtor.Body.Instructions.Add(Instruction.Create(OpCodes.Ldarg_0));
+        _mmNoNewCtor.Body.Instructions.Add(Instruction.Create(OpCodes.Call, new MethodReference(".ctor", Module.TypeSystem.Void, typeReference) {
+            HasThis = false
+        }));
+        _mmNoNewCtor.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
+        typeDefinition.Methods.Add(_mmNoNewCtor);
+        Module.Types.Add(typeDefinition);
+        return _mmNoNewCtor;
+    }
+
+    private MethodDefinition _mmIgnoreCtor;
+    private MethodDefinition _mmNoNewCtor;
 }

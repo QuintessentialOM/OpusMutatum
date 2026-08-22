@@ -120,6 +120,9 @@ public static class OpusMutatum {
                 case Command.Intermediary:
                     Tasks.HandleIntermediarySteps(task.Args);
                     break;
+                case Command.MergeDev:
+                    Tasks.HandleMergeDev(task.Args);
+                    break;
                 case Command.Merge:
                     Tasks.HandleMerge(task.Args);
                     break;
@@ -147,6 +150,8 @@ public static class OpusMutatum {
     private static void HandleSetup() {
         Globals.PathToOutput = Globals.Tasks.GameDir;
         Globals.PathToTemporaryOutput = Path.Combine(Globals.Tasks.GameDir, "temp");
+        ModLoader.PathToMods = Globals.Tasks.ModsDir;
+        ModLoader.PathToUnpackedMods = Path.Combine(Globals.Tasks.GameDir, "UnpackedMods");
         Remapping.PathToMappings = Globals.Tasks.MappingsDir;
 
         autoExit = Globals.Tasks.AutoExit || autoExit;

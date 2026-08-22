@@ -53,6 +53,7 @@ public static class Patching {
                     modder.ReadMod(mod);
 
                 modder.MapDependencies();
+                modder.Module.PatchTargetArchitecture();
                 modder.Log("[Main] Begin patching.");
                 modder.PrePatchAssembly();
                 modder.AutoPatch();
@@ -62,6 +63,38 @@ public static class Patching {
         } catch {
             if (File.Exists(asmTo) && asmTo != asmFrom) File.Delete(asmTo);
             throw;
+        }
+    }
+
+    public static void PatchTargetArchitecture(this ModuleDefinition module) {
+        var moduleArch = module.Architecture;
+        switch (System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture) {
+
+            case System.Runtime.InteropServices.Architecture.Arm:
+                if (moduleArch != TargetArchitecture.ARM || moduleArch != TargetArchitecture.ARMv7)
+                    module.Architecture = TargetArchitecture.ARM;
+                return;
+
+            case System.Runtime.InteropServices.Architecture.Arm64:
+                module.Architecture = TargetArchitecture.ARM64;
+                return;
+
+            case System.Runtime.InteropServices.Architecture.Armv6:
+                if (moduleArch != TargetArchitecture.ARM || moduleArch != TargetArchitecture.ARMv7)
+                    module.Architecture = TargetArchitecture.ARM;
+                return;
+
+            case System.Runtime.InteropServices.Architecture.X64:
+            case System.Runtime.InteropServices.Architecture.X86:   // What should this be ???
+                module.Architecture = TargetArchitecture.AMD64;
+                return;
+
+            case System.Runtime.InteropServices.Architecture.LoongArch64:
+            case System.Runtime.InteropServices.Architecture.Ppc64le:
+            case System.Runtime.InteropServices.Architecture.RiscV64:
+            case System.Runtime.InteropServices.Architecture.S390x:
+            case System.Runtime.InteropServices.Architecture.Wasm:
+                return;
         }
     }
 }

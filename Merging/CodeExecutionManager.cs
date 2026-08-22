@@ -171,6 +171,7 @@ public class CodeExecutionManager {
                 Runtime = TargetRuntime.Net_2_0
             }
         );
+        wrapper.PatchTargetArchitecture();
         var wrapperMod = new MonoModCodeRulesModder() {
             Module = wrapper,
             Orig = orig,

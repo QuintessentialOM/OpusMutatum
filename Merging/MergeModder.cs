@@ -2,7 +2,6 @@
 using Mono.Cecil.Cil;
 using Mono.Collections.Generic;
 using MonoMod;
-using MonoMod.InlineRT;
 using MonoMod.Utils;
 using OpusMutatum;
 using System;

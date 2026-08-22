@@ -107,7 +107,10 @@ public static class Globals {
                 FileName = "/bin/bash",
                 Arguments = $"-c \"{command}\""
             },
-            OS.MacOS => new ProcessStartInfo(), // idk
+            OS.MacOS => new ProcessStartInfo {
+                FileName = "/bin/bash",
+                Arguments = $"-c \"{command}\""
+            },
             _ => new ProcessStartInfo()
         };
         startInfo.RedirectStandardOutput = true;

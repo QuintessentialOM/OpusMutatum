@@ -26,7 +26,8 @@ public class ModificationStash(MethodLayerTable layerTable, CodeExecutionManager
 
             var origTargetMethodName = (string)injector.atrib.ConstructorArguments[0].Value;
             string targetMethodName = layerTable.TransformOriginalMethodName(origTargetMethodName, injector.targetType.GetPatchFullName());
-            var modifiedMethod = injector.targetType.FindMethodByName(targetMethodName);
+            var modifiedMethod = (targetMethodName.Contains('(') ? injector.targetType.FindMethod(id: targetMethodName) : injector.targetType.FindMethodByName(methodName: targetMethodName))
+                ?? throw new Exception($"Failed to identify target method for '{injector.methodName}'");
 
             var injectorMethod = executionManager.GetExecutingMethod(injector.methodName, injector.patchTypeName, injector.modId);
             injectorMethod?.Invoke(null, [modifiedMethod, injector.atrib]);

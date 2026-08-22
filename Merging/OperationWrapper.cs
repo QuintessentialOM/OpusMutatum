@@ -46,7 +46,7 @@ public class OperationWrapper(ModificationStash stash) {
             ?? throw new Exception($"Failed to identify original method type for '{method.Name}'");
         var origCalledMethod = origCalledMethodDeclaringType.FindMethodAddNonStaticBase(method.GetIDWithIgnore(name: callMetadata.Split("::")[1], type: origCalledMethodDeclaringType.FullName, nonStaticBaseType: method.IsStatic ? null : method.DeclaringType))
             ?? throw new Exception($"Failed to identify original method for '{method.Name}'");
-        var modifiedMethod = targetType.FindMethodByName(methodName: targetMethodName)
+        var modifiedMethod = (targetMethodName.Contains('(') ? targetType.FindMethod(id: targetMethodName) : targetType.FindMethodByName(methodName: targetMethodName))
             ?? throw new Exception($"Failed to identify target method for '{method.Name}'");
 
         var functMethod = GenerateFunctMethod(targetType, origCalledMethod, nameData.GenerateName(layer));
@@ -108,7 +108,7 @@ public class OperationWrapper(ModificationStash stash) {
             ?? throw new Exception($"Failed to identify original field type for '{method.Name}'");
         var origCalledField = origCalledFieldDeclaringType.FindFieldDeep(name: callMetadata.Split("::")[1])
             ?? throw new Exception($"Failed to identify original field for '{method.Name}'");
-        var modifiedMethod = targetType.FindMethodByName(methodName: targetMethodName)
+        var modifiedMethod = (targetMethodName.Contains('(') ? targetType.FindMethod(id: targetMethodName) : targetType.FindMethodByName(methodName: targetMethodName))
             ?? throw new Exception($"Failed to identify target method for '{method.Name}'");
 
         var functMethod = isRead ? GenerateFunctReadFieldMethod(targetType, origCalledField, nameData.GenerateName(layer))
@@ -190,7 +190,7 @@ public class OperationWrapper(ModificationStash stash) {
 
     public static void GenerateForStringLiteral(TypeDefinition targetType, MethodDefinition method, string targetMethodName, WrapOperationNameData nameData, string callMetadata, int layer) {
         // The callMetadata is the searched stringLiteral
-        var modifiedMethod = targetType.FindMethodByName(methodName: targetMethodName)
+        var modifiedMethod = (targetMethodName.Contains('(') ? targetType.FindMethod(id: targetMethodName) : targetType.FindMethodByName(methodName: targetMethodName))
             ?? throw new Exception($"Failed to identify target method for '{method.Name}'");
         if (layer == 0) {
             InjectMethodCallAfterString(modifiedMethod, callMetadata, method, layer);
@@ -200,7 +200,7 @@ public class OperationWrapper(ModificationStash stash) {
     }
     public static void GenerateForNumericLiteral(TypeDefinition targetType, MethodDefinition method, string targetMethodName, WrapOperationNameData nameData, string callMetadata, int layer, bool isEnum) {
         // The callMetadata is the searched stringLiteral
-        var modifiedMethod = targetType.FindMethodByName(methodName: targetMethodName)
+        var modifiedMethod = (targetMethodName.Contains('(') ? targetType.FindMethod(id: targetMethodName) : targetType.FindMethodByName(methodName: targetMethodName))
             ?? throw new Exception($"Failed to identify target method for '{method.Name}'");
         int @int = 0; long @long = 0; float @float = 0; double @double = 0; TypeDefinition @enum = null;
         NumericLiteralType type;
@@ -272,7 +272,7 @@ public class OperationWrapper(ModificationStash stash) {
     #region targetNew
 
     public static void GenerateForNew(TypeDefinition targetType, MethodDefinition method, string targetMethodName, WrapOperationNameData nameData, string callMetadata, int layer) {
-        var modifiedMethod = targetType.FindMethodByName(methodName: targetMethodName)
+        var modifiedMethod = (targetMethodName.Contains('(') ? targetType.FindMethod(id: targetMethodName) : targetType.FindMethodByName(methodName: targetMethodName))
             ?? throw new Exception($"Failed to identify target method for '{method.Name}'");
         var objType = targetType.Module.FindType(callMetadata)
             ?? throw new Exception($"Failed to identify type for '{method.Name}'");

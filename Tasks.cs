@@ -121,12 +121,12 @@ public static class Tasks {
         }
         ModLoader.LoadMods(); // TODO: add caching
         Console.WriteLine();
-        string[] dllPaths = [.. ModLoader.DllPaths];
+        var dllPaths = ModLoader.DllPaths;
 
         string asmFrom = Path.Combine(Globals.PathToOutput, asNamed ? Globals.PathToNamedLightning : Globals.PathToIntermediaryLightning);
         string moddedLightningPath = Path.Combine(Globals.PathToOutput, Globals.PathToModdedLightning);
 
-        if (onlyOnChange && GuidUtils.SameMvidAssemblies([.. dllPaths, asmFrom], moddedLightningPath)) {
+        if (onlyOnChange && GuidUtils.SameMvidAssemblies([.. dllPaths.Values, asmFrom], moddedLightningPath)) {
             Console.WriteLine("Found cache, skipping modded assembly generation.");
             return;
         }
@@ -165,12 +165,12 @@ public static class Tasks {
 
         Console.WriteLine();
         Console.WriteLine("Generating development assembly...");
-        string[] dllPaths = [.. ModLoader.GetDevMods(modId, [modId, .. Globals.Tasks.DevModIds], true)];
+        var dllPaths = ModLoader.GetDevMods(modId, [modId, .. Globals.Tasks.DevModIds], true);
 
         string asmFrom = Path.Combine(Globals.PathToOutput, Globals.PathToNamedLightning);
         string devLightningPath = Path.Combine(Globals.PathToOutput, "DevLightning.dll");
 
-        if (onlyOnChange && GuidUtils.SameMvidAssemblies([.. dllPaths, asmFrom], devLightningPath)) {
+        if (onlyOnChange && GuidUtils.SameMvidAssemblies([.. dllPaths.Values, asmFrom], devLightningPath)) {
             Console.WriteLine("Found cache, skipping development assembly generation.");
             return;
         }

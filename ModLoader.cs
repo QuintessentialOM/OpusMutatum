@@ -16,7 +16,7 @@ static public class ModLoader {
     public static string PathToUnpackedMods;
     private static string PathToBlacklist;
     public static List<ModMeta> Mods { private set; get; } = [];
-    public static List<string> DllPaths { private set; get; } = [];
+    public static OrderedDictionary<string, string> DllPaths { private set; get; } = [];
     public static bool IsCompleted { private set; get; } = false;
     private static bool ModsCollected = false;
 
@@ -45,7 +45,7 @@ static public class ModLoader {
         IsCompleted = true;
         CreateDataFile();
     }
-    public static List<string> GetDevMods(string developedModId, List<string> forceLoadIds, bool logModList = false) {
+    public static OrderedDictionary<string, string> GetDevMods(string developedModId, List<string> forceLoadIds, bool logModList = false) {
         if (IsCompleted) throw new Exception("GetDevMods() must be called before LoadMods()");
 
         Log("Starting dev mod loading...");
@@ -275,15 +275,15 @@ static public class ModLoader {
             }
         }
     }
-    private static List<string> CollectDlls(List<ModMeta> mods) {
-        List<string> dlls = [];
+    private static OrderedDictionary<string, string> CollectDlls(List<ModMeta> mods) {
+        OrderedDictionary<string, string> dlls = [];
         foreach (var mod in mods) {
             if (mod.DLL != "") {
                 if (mod.PathToDirectory != null) {
                     string dllPath = Path.Combine(mod.PathToDirectory, mod.DLL);
                     if (File.Exists(dllPath) && Path.GetExtension(dllPath) == ".dll") {
                         mod.HasDll = true;
-                        dlls.Add(dllPath);
+                        dlls.Add(mod.ModId, dllPath);
                     }
                 }
             }

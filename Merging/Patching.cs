@@ -1,7 +1,7 @@
 using Mono.Cecil;
 using System;
+using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 
 namespace OpusMutatum.Merging;
 
@@ -10,7 +10,7 @@ public static class Patching {
     public static string PathToPatchingDependencies = "";
 
 
-    public static void RunMerge(string asmFrom, string asmTo = null, string[] dllPaths = null, bool mergeDllMvids = false) {
+    public static void RunMerge(string asmFrom, string asmTo = null, OrderedDictionary<string, string> dllPaths = null, bool mergeDllMvids = false) {
 
         asmTo ??= asmFrom;
         dllPaths ??= [];
@@ -27,7 +27,7 @@ public static class Patching {
             if (mergeDllMvids) {
                 string asmTmp2 = Path.Combine(Globals.PathToTemporaryOutput, "2_" + Path.GetFileName(asmTo));
                 using var def = AssemblyDefinition.ReadAssembly(asmTmp);
-                string[] assembliesMerged = dllPaths.Append(asmFrom).ToArray();
+                string[] assembliesMerged = [.. dllPaths.Values, asmFrom];
                 def.MainModule.Mvid = GuidUtils.MergeAssemblyMvids(assembliesMerged);
                 def.Write(asmTmp2);
                 File.Move(asmTmp2, asmTo, overwrite: true);
@@ -39,7 +39,7 @@ public static class Patching {
             File.Delete(Path.ChangeExtension(asmTmp, "mdb"));
         }
     }
-    public static void RunMergeModder(string asmFrom, string asmTo, string[] dllPaths = null) {
+    public static void RunMergeModder(string asmFrom, string asmTo, OrderedDictionary<string, string> dllPaths = null) {
         try {
 
             using (MergeModder modder = new() {

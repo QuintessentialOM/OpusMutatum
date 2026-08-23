@@ -5,12 +5,15 @@ using MonoMod;
 using MonoMod.Utils;
 using OpusMutatum;
 using System;
+using System.Collections.Generic;
 
 namespace OpusMutatum.Merging;
 
 public class MergeModder : MonoModder {
     private const string LogID = "Merger";
 
+    public List<string> ModIds = [];
+    public string CurrentModID;
     public readonly MethodLayerTable LayerTable;
     public readonly ModificationStash Stash;
     public readonly OperationWrapper OpWrapper;
@@ -28,20 +31,32 @@ public class MergeModder : MonoModder {
     }
     public override void LogVerbose(string text) { }
 
+    public virtual void ReadMod(KeyValuePair<string, string> modPair) {
+        var orig = Mods.Count;
+        base.ReadMod(modPair.Value);
+
+        if (orig < Mods.Count) {
+            ModIds.Add(modPair.Key);
+        }
+    }
     public override void AutoPatch() {
         Log("[AutoPatch] Parsing rules in loaded mods");
-        foreach (ModuleDefinition mod4 in Mods) {
-            ParseRules(mod4);
+        for (int i = 0; i < Mods.Count; i++) {
+            CurrentModID = ModIds[i];
+            ParseRules((ModuleDefinition)Mods[i]);
         }
         ExecutionManager.Compile();
         Log("[AutoPatch] PrePatch pass");
-        foreach (ModuleDefinition mod5 in Mods) {
-            PrePatchModule(mod5);
+        for (int i = 0; i < Mods.Count; i++) {
+            CurrentModID = ModIds[i];
+            PrePatchModule((ModuleDefinition)Mods[i]);
         }
         Log("[AutoPatch] Patch pass");
-        foreach (ModuleDefinition mod6 in Mods) {
-            PatchModule(mod6);
+        for (int i = 0; i < Mods.Count; i++) {
+            CurrentModID = ModIds[i];
+            PatchModule((ModuleDefinition)Mods[i]);
         }
+        CurrentModID = null;
         Log("[AutoPatch] PatchRefs pass");
         PatchRefs();
         if (PostProcessors != null) {
@@ -62,7 +77,7 @@ public class MergeModder : MonoModder {
             if (IsPatchType(type)) {
                 foreach (var method in type.Methods) {
                     if (method.GetCustomAttribute("MonoMod.MonoModILInject") is CustomAttribute ILInject) {
-                        ExecutionManager.ReadMethod(type, method, "test");    // TODO replace "test" with mod_id;
+                        ExecutionManager.ReadMethod(type, method, CurrentModID);
                     }
                 }
             }
@@ -81,7 +96,7 @@ public class MergeModder : MonoModder {
     public override MethodDefinition PatchMethod(TypeDefinition targetType, MethodDefinition method) {
 
         if (method.GetCustomAttribute("MonoMod.MonoModILInject") is CustomAttribute injectAtrib && injectAtrib != null) {
-            Stash.PushILInjector(injectAtrib, targetType, method.Name, method.DeclaringType.Name, "test");    // TODO replace "test" with mod_id;
+            Stash.PushILInjector(injectAtrib, targetType, method.Name, method.DeclaringType.Name, CurrentModID);
             return null;
         }
 

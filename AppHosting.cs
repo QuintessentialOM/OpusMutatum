@@ -18,7 +18,7 @@ public static partial class AppHosting {
         string argsString = args is not null
             ? $"{assembly} {string.Join(' ', args)}"
             : assembly;
-        Globals.RunAndWait($"dotnet {argsString}", debugger);
+        Globals.RunAndWaitDotnet(argsString, debugger);
     }
 
     public static void CreateRuntimeConfigFiles(string assembly, string[] manualDependencies = null) {

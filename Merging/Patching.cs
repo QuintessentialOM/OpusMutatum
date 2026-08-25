@@ -67,8 +67,15 @@ public static class Patching {
     }
 
     public static void PatchTargetArchitecture(this ModuleDefinition module) {
+        Console.WriteLine(" -><- Data for: " + module.Name);
+        Console.WriteLine(" -<>- The module  architecture is: " + module.Architecture);
+        Console.WriteLine(" -<>- The process architecture is: " + System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture);
+        Console.WriteLine(" -<>- The os      architecture is: " + System.Runtime.InteropServices.RuntimeInformation.OSArchitecture);
+        Console.WriteLine(" -<>- The Runtime Identifier   is: " + System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier);
+        return;
+        module.Architecture = TargetArchitecture.I386;
         var moduleArch = module.Architecture;
-        switch (System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture) {
+        switch (System.Runtime.InteropServices.RuntimeInformation.OSArchitecture) {
 
             case System.Runtime.InteropServices.Architecture.Arm:
                 if (moduleArch != TargetArchitecture.ARM || moduleArch != TargetArchitecture.ARMv7)

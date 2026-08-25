@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using Mono.Cecil;
 
@@ -95,6 +96,7 @@ public static class Globals {
         => TryLoadAssemblyDef(Path.Combine(PathToOutput, PathToModdedLightning), out moddedLightningAssemblyDef);
 
     public static void RunAndWait(string command, RunDebugger debugger = null) {
+
         Console.WriteLine($"Running `{command}`...");
 
         ProcessStartInfo startInfo = OperatingSystem switch {
@@ -116,6 +118,9 @@ public static class Globals {
         startInfo.RedirectStandardOutput = true;
         startInfo.UseShellExecute = false;
 
+        if (startInfo.EnvironmentVariables["Path"] != null)
+            startInfo.EnvironmentVariables["Path"] = startInfo.EnvironmentVariables["Path"] + ";" + Directory.GetCurrentDirectory();
+
         Process process = new() { StartInfo = startInfo };
         debugger?.BeforeProcessStart();
         process.Start();
@@ -128,5 +133,13 @@ public static class Globals {
             Console.WriteLine("Process output:");
             Console.WriteLine(output);
         }
+    }
+    public static void RunAndWaitDotnet(string argsString, RunDebugger debugger = null) {
+        var exePath = Environment.GetEnvironmentVariable("Path").Split(";").Single(path => path.EndsWith("dotnet\\") || path.EndsWith("dotnet/") || path.EndsWith("dotnet"));
+        exePath = Directory.EnumerateDirectories(exePath).SingleOrDefault(path => path.EndsWith("x64"), exePath);
+        exePath = Directory.EnumerateFiles(exePath).Single(path => Path.GetFileName(path) == "dotnet.exe");
+
+        var command = "\"" + exePath + "\" " + argsString;
+        RunAndWait(command, debugger);
     }
 }

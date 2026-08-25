@@ -136,7 +136,7 @@ public static class Globals {
     }
     public static void RunAndWaitDotnet(string argsString, RunDebugger debugger = null) {
 
-        if (Environment.GetEnvironmentVariables().Contains("Path")) {
+        if (Environment.GetEnvironmentVariables() != null && Environment.GetEnvironmentVariables().Contains("Path")) {
             var exePath = Environment.GetEnvironmentVariable("Path").Split(";").Single(path => path.EndsWith("dotnet\\") || path.EndsWith("dotnet/") || path.EndsWith("dotnet"));
             exePath = Directory.EnumerateDirectories(exePath).SingleOrDefault(path => path.EndsWith("x64"), exePath);
             exePath = Directory.EnumerateFiles(exePath).Single(path => Path.GetFileName(path) == "dotnet.exe");

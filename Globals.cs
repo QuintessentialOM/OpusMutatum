@@ -135,11 +135,15 @@ public static class Globals {
         }
     }
     public static void RunAndWaitDotnet(string argsString, RunDebugger debugger = null) {
-        var exePath = Environment.GetEnvironmentVariable("Path").Split(";").Single(path => path.EndsWith("dotnet\\") || path.EndsWith("dotnet/") || path.EndsWith("dotnet"));
-        exePath = Directory.EnumerateDirectories(exePath).SingleOrDefault(path => path.EndsWith("x64"), exePath);
-        exePath = Directory.EnumerateFiles(exePath).Single(path => Path.GetFileName(path) == "dotnet.exe");
 
-        var command = "\"" + exePath + "\" " + argsString;
-        RunAndWait(command, debugger);
+        if (Environment.GetEnvironmentVariables().Contains("Path")) {
+            var exePath = Environment.GetEnvironmentVariable("Path").Split(";").Single(path => path.EndsWith("dotnet\\") || path.EndsWith("dotnet/") || path.EndsWith("dotnet"));
+            exePath = Directory.EnumerateDirectories(exePath).SingleOrDefault(path => path.EndsWith("x64"), exePath);
+            exePath = Directory.EnumerateFiles(exePath).Single(path => Path.GetFileName(path) == "dotnet.exe");
+
+            var command = "\"" + exePath + "\" " + argsString;
+            RunAndWait(command, debugger);
+        } else
+            RunAndWait($"dotnet {argsString}", debugger);
     }
 }

@@ -53,7 +53,6 @@ public static class Patching {
                     modder.ReadMod(mod);
 
                 modder.MapDependencies();
-                modder.Module.PatchTargetArchitecture();
                 modder.Log("[Main] Begin patching.");
                 modder.PrePatchAssembly();
                 modder.AutoPatch();
@@ -63,45 +62,6 @@ public static class Patching {
         } catch {
             if (File.Exists(asmTo) && asmTo != asmFrom) File.Delete(asmTo);
             throw;
-        }
-    }
-
-    public static void PatchTargetArchitecture(this ModuleDefinition module) {
-        Console.WriteLine(" -><- Data for: " + module.Name);
-        Console.WriteLine(" -<>- The module  architecture is: " + module.Architecture);
-        Console.WriteLine(" -<>- The process architecture is: " + System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture);
-        Console.WriteLine(" -<>- The os      architecture is: " + System.Runtime.InteropServices.RuntimeInformation.OSArchitecture);
-        Console.WriteLine(" -<>- The Runtime Identifier   is: " + System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier);
-        return;
-        module.Architecture = TargetArchitecture.I386;
-        var moduleArch = module.Architecture;
-        switch (System.Runtime.InteropServices.RuntimeInformation.OSArchitecture) {
-
-            case System.Runtime.InteropServices.Architecture.Arm:
-                if (moduleArch != TargetArchitecture.ARM || moduleArch != TargetArchitecture.ARMv7)
-                    module.Architecture = TargetArchitecture.ARM;
-                return;
-
-            case System.Runtime.InteropServices.Architecture.Arm64:
-                module.Architecture = TargetArchitecture.ARM64;
-                return;
-
-            case System.Runtime.InteropServices.Architecture.Armv6:
-                if (moduleArch != TargetArchitecture.ARM || moduleArch != TargetArchitecture.ARMv7)
-                    module.Architecture = TargetArchitecture.ARM;
-                return;
-
-            case System.Runtime.InteropServices.Architecture.X64:
-            case System.Runtime.InteropServices.Architecture.X86:   // What should this be ???
-                module.Architecture = TargetArchitecture.AMD64;
-                return;
-
-            case System.Runtime.InteropServices.Architecture.LoongArch64:
-            case System.Runtime.InteropServices.Architecture.Ppc64le:
-            case System.Runtime.InteropServices.Architecture.RiscV64:
-            case System.Runtime.InteropServices.Architecture.S390x:
-            case System.Runtime.InteropServices.Architecture.Wasm:
-                return;
         }
     }
 }

@@ -164,7 +164,7 @@ public class CodeExecutionManager {
         var wrapper = ModuleDefinition.CreateModule(
             $"{self.Module.Name[..^4]}.MonoModRules [MMILRT, ID:{MonoModRulesManager.GetId(self)}]",
             new ModuleParameters() {
-                Architecture = self.Module.Architecture,
+                Architecture = TargetArchitecture.I386,
                 AssemblyResolver = self.AssemblyResolver,
                 Kind = ModuleKind.Dll,
                 MetadataResolver = self.Module.MetadataResolver,
@@ -175,7 +175,7 @@ public class CodeExecutionManager {
         var wrapperMod = new MonoModCodeRulesModder() {
             Module = wrapper,
             Orig = orig,
-
+            
             CleanupEnabled = false,
 
             DependencyDirs = self.DependencyDirs,

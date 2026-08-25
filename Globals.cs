@@ -118,7 +118,7 @@ public static class Globals {
         startInfo.RedirectStandardOutput = true;
         startInfo.UseShellExecute = false;
 
-        if (startInfo.EnvironmentVariables["Path"] != null)
+        if (startInfo.EnvironmentVariables.ContainsKey("Path"))
             startInfo.EnvironmentVariables["Path"] = startInfo.EnvironmentVariables["Path"] + ";" + Directory.GetCurrentDirectory();
 
         Process process = new() { StartInfo = startInfo };

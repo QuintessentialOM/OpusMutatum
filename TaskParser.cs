@@ -31,11 +31,11 @@ public static class TaskParser {
 
             while ((line = st.ReadLine()) != null) {
                 if (line == "") continue;
-                line = line.Trim(new char[] { ' ' });
-                if (line.StartsWith("#")) { readingMode = ReadingMode.None; continue; }
+                line = line.Trim([' ']);
+                if (line.StartsWith('#')) { continue; }
 
-                if (line.StartsWith("*") && readingMode != ReadingMode.None) {
-                    line = line.Substring(1).Trim(new char[] { ' ' });
+                if (line.StartsWith('*') && readingMode != ReadingMode.None) {
+                    line = line[1..].Trim([' ']);
                     isList = true;
                 } else if (isList) readingMode = ReadingMode.None;
 
@@ -43,6 +43,8 @@ public static class TaskParser {
                     isList = false;
                     if (line == "Tasks:") {
                         readingMode = ReadingMode.Tasks;
+                    } else if (line == "DevMods:") {
+                        readingMode = ReadingMode.DevMods;
                     } else if (line == "GameDir:") {
                         readingMode = ReadingMode.GameDir;
                     } else if (line == "ModsDir:") {
@@ -68,6 +70,9 @@ public static class TaskParser {
             case ReadingMode.Tasks:
                 tasks.Tasks.Add(new Task(line));
                 break;
+            case ReadingMode.DevMods:
+                tasks.DevModIds.Add(line);
+                break;
             case ReadingMode.GameDir:
                 tasks.GameDir = line;
                 break;
@@ -91,6 +96,7 @@ public static class TaskParser {
     private enum ReadingMode {
         None,
         Tasks,
+        DevMods,
         GameDir,
         ModsDir,
         MappingsDir,
@@ -108,7 +114,8 @@ public class MutatumTasks {
 
     public bool AutoExit = false;
 
-    public List<string> BoundVSProjects; // TODO: not just vs
+    public List<string> DevModIds = [];
+    public List<string> BoundVSProjects = []; // TODO: not just vs
 }
 
 public class Task {
@@ -117,7 +124,7 @@ public class Task {
 
     public Task(string line) {
         string[] items = line.Trim().Split(' ');
-        List<string> argsList = new List<string>();
+        List<string> argsList = [];
 
         if (!Commands.TryGetValue(items[0], out this.Command)) throw new Exception("The command specified at: " + line + " is invalid");
 
@@ -127,24 +134,25 @@ public class Task {
             if (isMultiArg) {
                 collectedArguments += " " + items[i];
 
-                if (!items[i].EndsWith("\"")) continue;
+                if (!items[i].EndsWith('\"')) continue;
                 isMultiArg = false;
                 argsList.Add(collectedArguments);
                 continue;
             }
-            if (items[i].StartsWith("\"") && !items[i].EndsWith("\"")) {
+            if (items[i].StartsWith('\"') && !items[i].EndsWith('\"')) {
                 collectedArguments = items[i];
                 isMultiArg = true;
                 continue;
             }
             argsList.Add(items[i]);
         }
-        Args = argsList.ToArray();
+        Args = [.. argsList];
     }
 
     private static readonly Dictionary<string, Command> Commands = new() {
         { "strings", Command.Strings },
         { "intermediary", Command.Intermediary },
+        { "devMerge", Command.MergeDev },
         { "merge", Command.Merge },
         { "newMod", Command.NewMod },
         { "copy", Command.Copy },
@@ -155,6 +163,7 @@ public class Task {
 public enum Command {
     Strings,
     Intermediary,
+    MergeDev,
     Merge,
     NewMod,
     Copy,

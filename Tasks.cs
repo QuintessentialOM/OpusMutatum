@@ -139,11 +139,16 @@ public static class Tasks {
     public static void HandleMergeDev(string[] args) {
         bool onlyOnChange = false;
         bool asId = false;
+        bool asNameOverride = false;
         string modId = "";
+        string nameOverride = "";
         foreach (var item in args) {
             if (asId) {
                 asId = false;
                 modId = item.Trim(['"']);
+            } else if (asNameOverride) {
+                asNameOverride = false;
+                nameOverride = item.Trim(['"']);
             } else {
                 switch (item) {
                     case "--onlyOnChange":
@@ -151,6 +156,9 @@ public static class Tasks {
                         break;
                     case "-id":
                         asId = true;
+                        break;
+                    case "-nameOverride":
+                        asNameOverride = true;
                         break;
                     default:
                         Console.WriteLine($"Invalid Argument '{item}' for 'devMerge' task.");
@@ -168,7 +176,7 @@ public static class Tasks {
         var dllPaths = ModLoader.GetDevMods(modId, [modId, .. Globals.Tasks.DevModIds], true);
 
         string asmFrom = Path.Combine(Globals.PathToOutput, Globals.PathToNamedLightning);
-        string devLightningPath = Path.Combine(Globals.PathToOutput, "DevLightning.dll");
+        string devLightningPath = Path.Combine(Globals.PathToOutput, nameOverride == "" ? "DevLightning.dll" : nameOverride);
 
         if (onlyOnChange && GuidUtils.SameMvidAssemblies([.. dllPaths.Values, asmFrom], devLightningPath)) {
             Console.WriteLine("Found cache, skipping development assembly generation.");

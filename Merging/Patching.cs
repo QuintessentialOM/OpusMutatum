@@ -10,7 +10,7 @@ public static class Patching {
     public static string PathToPatchingDependencies = "";
 
 
-    public static void RunMerge(string asmFrom, string asmTo = null, OrderedDictionary<string, string> dllPaths = null, bool mergeDllMvids = false) {
+    public static void RunMerge(string asmFrom, string asmTo = null, OrderedDictionary<string, string> dllPaths = null, bool mergeDllMvids = false, bool removeConflictingTypes = false) {
 
         asmTo ??= asmFrom;
         dllPaths ??= [];
@@ -22,7 +22,7 @@ public static class Patching {
             Environment.SetEnvironmentVariable("MONOMOD_DEPDIRS", PathToPatchingDependencies);
             Environment.SetEnvironmentVariable("MONOMOD_DEPENDENCY_MISSING_THROW", "0");
 
-            RunMergeModder(asmFrom, asmTmp, dllPaths);
+            RunMergeModder(asmFrom, asmTmp, dllPaths, removeConflictingTypes);
 
             if (mergeDllMvids) {
                 string asmTmp2 = Path.Combine(Globals.PathToTemporaryOutput, "2_" + Path.GetFileName(asmTo));
@@ -39,7 +39,7 @@ public static class Patching {
             File.Delete(Path.ChangeExtension(asmTmp, "mdb"));
         }
     }
-    public static void RunMergeModder(string asmFrom, string asmTo, OrderedDictionary<string, string> dllPaths = null) {
+    public static void RunMergeModder(string asmFrom, string asmTo, OrderedDictionary<string, string> dllPaths = null, bool removeConflictingTypes = false) {
         try {
 
             using (MergeModder modder = new() {
@@ -56,6 +56,7 @@ public static class Patching {
                 modder.Log("[Main] Begin patching.");
                 modder.PrePatchAssembly();
                 modder.AutoPatch();
+                modder.PostPatchAssembly(removeConflictingTypes);
                 modder.Write(null, null);
                 modder.Log("[Main] Done.");
             }

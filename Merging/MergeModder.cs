@@ -138,6 +138,9 @@ public class MergeModder : MonoModder {
         MethodDefinition existingMethod = targetType.FindMethod(method.GetID(type: typeName));
         MethodDefinition origMethod = null;
 
+        if (targetType.FullName.StartsWith("<>z__") && existingMethod != null)
+            return null;
+
         if (method.HasCustomAttribute("MonoMod.MonoModIgnore")) {
             // MonoModIgnore is a special case, as registered custom attributes should still be applied.
             if (existingMethod != null)
@@ -193,7 +196,7 @@ public class MergeModder : MonoModder {
             if (!method.HasCustomAttribute("MonoMod.MonoModConstructor")) {
                 Collection<Instruction> instructions = method.Body.Instructions;
                 ILProcessor ilProcessor = method.Body.GetILProcessor();
-                ilProcessor.InsertBefore(instructions[instructions.Count - 1], ilProcessor.Create(OpCodes.Call, origMethod));
+                ilProcessor.InsertBefore(instructions[^1], ilProcessor.Create(OpCodes.Call, origMethod));
             } else {
                 for (int i = 0; i < method.Body.Instructions.Count; i++) {
                     ILProcessor ilProcessor = method.Body.GetILProcessor();
@@ -274,6 +277,39 @@ public class MergeModder : MonoModder {
         }
     }
 
+    public void PostPatchAssembly(bool removeConflicting) {
+        if (removeConflicting) {
+            for (int i = 0; i < Module.Types.Count; i++) {
+                switch (Module.Types[i].FullName) {
+                    case "MonoMod.MonoModAdded":
+                    case "MonoMod.MonoModConstructor":
+                    case "MonoMod.MonoModCustomAttributeAttribute":
+                    case "MonoMod.MonoModEnumReplace":
+                    case "MonoMod.MonoModForceCall ":
+                    case "MonoMod.MonoModForceCallvirt":
+                    case "MonoMod.MonoModHook":
+                    case "MonoMod.MonoModIfFlag":
+                    case "MonoMod.MonoModIgnore":
+                    case "MonoMod.MonoModLinkFrom":
+                    case "MonoMod.MonoModLinkTo":
+                    case "MonoMod.MonoModNoNew":
+                    case "MonoMod.MonoModOnPlatform":
+                    case "MonoMod.MonoModOriginal":
+                    case "MonoMod.MonoModOriginalName":
+                    case "MonoMod.MonoModPatch":
+                    case "MonoMod.MonoModPublic":
+                    case "MonoMod.MonoModRemove":
+                    case "MonoMod.MonoModReplace":
+                    case "MonoMod.MonoModTargetModule":
+                    case "MonoMod.MonoMod__SafeToCopy__":
+                        Module.Types.RemoveAt(i);
+                        i--;
+                        break;
+                    default: break;
+                }
+            }
+        }
+    }
 
     public virtual MethodReference GetMonoModIgnoreCtor() {
         if (_mmIgnoreCtor != null && _mmIgnoreCtor.Module != Module) {

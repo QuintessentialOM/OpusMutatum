@@ -9,7 +9,7 @@ namespace OpusMutatum;
 public static class TaskParser {
 
     static readonly string tasksFileName = "tasks.txt";
-    static readonly string exampleFileData = "Tasks:\r\n* strings --onlyOnChange\r\n* intermediary --onlyOnChange\r\n* merge --onlyOnChange --asNamed\r\n* run --readLogs\r\n\r\nAutoExit:\r\n  false";
+    static readonly string exampleFileData = "Tasks:\r\n* strings --onlyOnChange\r\n* intermediary --onlyOnChange\r\n* merge --onlyOnChange --asNamed\r\n* run --readLogs\r\n\r\nAutoExit:\r\n  true";
 
     private static string tasksCloneTargetPath = "";
     public static MutatumTasks ReadTasksFromFile() {

@@ -124,6 +124,7 @@ public static class Tasks {
     }
 
     public static void HandleMerge(string[] args) {
+        throw new NotImplementedException();
         bool onlyOnChange = false;
         bool asNamed = false;
         foreach (var item in args) {

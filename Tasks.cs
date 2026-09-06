@@ -264,7 +264,7 @@ public static class Tasks {
         Console.WriteLine($"Running {Path.GetFileName(target)}...");
 
         DependencyHandling.SetupNativeLibLoading();
-        AppHosting.RunAssembly(target, gameDebugger.runArgs, debugger: gameDebugger);
+        AppHosting.RunAssembly(target, gameDebugger.runArgs, debugger: gameDebugger, throwOnInternalError: true);
     }
 
     public static void HandleCopy(string[] args) {

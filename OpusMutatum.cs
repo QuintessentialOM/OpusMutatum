@@ -36,7 +36,20 @@ public static class OpusMutatum {
 
         } catch (Exception e) {
             Console.WriteLine("Error running Mutatum:");
-            Console.WriteLine(e.ToString());
+            if (e is Globals.InternalProcessError) {
+                var messages = "";
+                var exc = e;
+                bool first = true;
+                while (exc != null) {
+                    if (first) first = false;
+                    else messages += "--: ";
+                    messages += exc.Message + "\n";
+                    exc = exc.InnerException;
+                }
+                if (!string.IsNullOrEmpty(messages))
+                    Console.WriteLine(messages);
+            } else
+                Console.WriteLine(e.ToString());
             Console.ReadKey();
         }
     }
@@ -142,6 +155,7 @@ public static class OpusMutatum {
         } catch (Exception e) {
             string taskText = task.Command.ToString() + " ";
             foreach (var arg in task.Args) taskText += arg + " ";
+            if (e is Globals.InternalProcessError) throw new Globals.InternalProcessError("Error executing task '" + taskText.Trim() + "':", e);
             throw new Exception("Error executing task '" + taskText.Trim() + "':", e);
         }
     }

@@ -95,7 +95,7 @@ public static class Globals {
     public static bool TryLoadModdedLightning(out AssemblyDefinition moddedLightningAssemblyDef)
         => TryLoadAssemblyDef(Path.Combine(PathToOutput, PathToModdedLightning), out moddedLightningAssemblyDef);
 
-    public static void RunAndWait(string command, RunDebugger debugger = null) {
+    public static void RunAndWait(string command, RunDebugger debugger = null, bool throwOnInternalError = false) {
 
         Console.WriteLine($"Running `{command}`...");
 
@@ -133,8 +133,9 @@ public static class Globals {
             Console.WriteLine("Process output:");
             Console.WriteLine(output);
         }
+        if (throwOnInternalError && process.ExitCode != 0) throw new InternalProcessError($"Failed to run command '{command}'");
     }
-    public static void RunAndWaitDotnet(string argsString, RunDebugger debugger = null) {
+    public static void RunAndWaitDotnet(string argsString, RunDebugger debugger = null, bool throwOnInternalError = false) {
 
         if (Environment.GetEnvironmentVariables() != null && Environment.GetEnvironmentVariables().Contains("Path")) {
             var exePath = Environment.GetEnvironmentVariable("Path").Split(";").Single(path => path.EndsWith("dotnet\\") || path.EndsWith("dotnet/") || path.EndsWith("dotnet"));
@@ -142,8 +143,13 @@ public static class Globals {
             exePath = Directory.EnumerateFiles(exePath).Single(path => Path.GetFileName(path) == "dotnet.exe");
 
             var command = "\"" + exePath + "\" " + argsString;
-            RunAndWait(command, debugger);
+            RunAndWait(command, debugger, throwOnInternalError);
         } else
-            RunAndWait($"dotnet {argsString}", debugger);
+            RunAndWait($"dotnet {argsString}", debugger, throwOnInternalError);
+    }
+
+    public class InternalProcessError : Exception {
+        public InternalProcessError(string message) : base(message) { }
+        public InternalProcessError(string message, Exception innerException) : base(message, innerException) { }
     }
 }

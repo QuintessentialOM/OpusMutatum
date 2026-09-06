@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 
 namespace OpusMutatum;
 
@@ -20,6 +19,9 @@ public static class Coreification {
             return;
 
         string[] deps = [.. DependencyHandling.GetAssemblyReferences(asmFrom).Keys];
+        if (deps.Contains("OpusMutatum"))
+            // if the assembly is already coreified, skip it
+            return;
 
         // coreify dependencies first
         foreach (string dep in deps) {

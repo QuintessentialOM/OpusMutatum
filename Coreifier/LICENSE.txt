@@ -1,3 +1,5 @@
+This notice applies to the contents of the Coreifier folder.
+
 The MIT License (MIT)
 
 Copyright (c) 2018 Everest Team

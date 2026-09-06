@@ -4,6 +4,7 @@ using MonoMod;
 using MonoMod.Utils;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 
@@ -51,7 +52,7 @@ public class FrameworkModder : MonoModder {
 
     public override void AutoPatch() {
         // parse our own patching rules
-        ParseRules(DependencyMap[Module].First(dep => dep.Assembly.Name.Name == "Coreifier"));
+        ParseRules(DependencyMap[Module].First(dep => dep.Assembly.Name.FullName == Assembly.GetExecutingAssembly().FullName));
 
         base.AutoPatch();
     }

@@ -10,8 +10,7 @@ using CustomAttributeNamedArgument = Mono.Cecil.CustomAttributeNamedArgument;
 namespace Coreifier;
 
 public static class Coreifier {
-    // called via reflection from OpusMutatum
-    public static void Coreify(string inputAsm, string outputAsm = null) {
+    internal static void Coreify(string inputAsm, string outputAsm = null) {
         ModuleDefinition module = null;
         try {
             // read the module
@@ -34,19 +33,17 @@ public static class Coreifier {
         }
     }
 
-    public static void Coreify(ModuleDefinition module, bool preventInlining = true) {
-        if (Assembly.GetEntryAssembly() is not { } mutatumAssembly || mutatumAssembly.GetName().Name != "OpusMutatum")
-            throw new InvalidOperationException("Coreifier must be invoked from OpusMutatum!");
-
+    internal static void Coreify(ModuleDefinition module, bool preventInlining = true) {
+        var assembly = Assembly.GetEntryAssembly();
         // set runtime version + clear 32-bit flags
-        module.RuntimeVersion = mutatumAssembly.ImageRuntimeVersion;
+        module.RuntimeVersion = assembly.ImageRuntimeVersion;
         module.Attributes &= ~(ModuleAttributes.Required32Bit | ModuleAttributes.Preferred32Bit);
 
         // patch target framework attribute + get the mscorlib scope
         IMetadataScope mscorlibScope = null;
         bool isFrameworkModule = false;
 
-        TargetFrameworkAttribute mutatumTargetFrameworkAttr = mutatumAssembly.GetCustomAttribute<TargetFrameworkAttribute>()
+        TargetFrameworkAttribute mutatumTargetFrameworkAttr = assembly.GetCustomAttribute<TargetFrameworkAttribute>()
             ?? throw new InvalidOperationException("OpusMutatum must be built to target .NET Core!");
         CustomAttribute lightningTargetFrameworkAttr = module.Assembly.CustomAttributes.FirstOrDefault(a => a.AttributeType.FullName == typeof(TargetFrameworkAttribute).FullName);
         if (lightningTargetFrameworkAttr is not null) {
@@ -69,7 +66,7 @@ public static class Coreifier {
             return;
 
         // patch debuggable attribute
-        DebuggableAttribute mutatumDebuggableAttr = mutatumAssembly.GetCustomAttribute<DebuggableAttribute>()
+        DebuggableAttribute mutatumDebuggableAttr = assembly.GetCustomAttribute<DebuggableAttribute>()
             ?? throw new InvalidOperationException("OpusMutatum must be built in the Debug configuration in order to invoke Coreifier!");
         CustomAttribute lightningDebuggableAttr = module.Assembly.CustomAttributes.FirstOrDefault(a => a.AttributeType.FullName == typeof(DebuggableAttribute).FullName);
 

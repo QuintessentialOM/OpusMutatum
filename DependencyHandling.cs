@@ -149,6 +149,7 @@ public static partial class DependencyHandling {
         }
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "Platform compatibility is checked with custom system.")]
     public static void SetupNativeLibLoading() {
         string baseNativeLibPath = Path.Combine(AppContext.BaseDirectory, Globals.PathToOutput);
 

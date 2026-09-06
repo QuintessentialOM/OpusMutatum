@@ -106,10 +106,14 @@ public static class Tasks {
     public static void HandleMerge(string[] args) {
         bool onlyOnChange = false;
         bool asNamed = false;
+        bool mergeXML = false;
         foreach (var item in args) {
             switch (item) {
                 case "--onlyOnChange":
                     onlyOnChange = true;
+                    break;
+                case "--mergeXML":
+                    mergeXML = true;
                     break;
                 case "--asNamed":
                     asNamed = true;
@@ -131,13 +135,14 @@ public static class Tasks {
             return;
         }
 
-        Patching.RunMerge(asmFrom, moddedLightningPath, dllPaths: dllPaths, true, false);
+        Patching.RunMerge(asmFrom, moddedLightningPath, dllPaths: dllPaths, true, false, mergeXML);
 
         Console.WriteLine();
     }
 
     public static void HandleMergeDev(string[] args) {
         bool onlyOnChange = false;
+        bool mergeXML = false;
         bool asId = false;
         bool asNameOverride = false;
         string modId = "";
@@ -153,6 +158,9 @@ public static class Tasks {
                 switch (item) {
                     case "--onlyOnChange":
                         onlyOnChange = true;
+                        break;
+                    case "--mergeXML":
+                        mergeXML = true;
                         break;
                     case "-id":
                         asId = true;
@@ -183,7 +191,7 @@ public static class Tasks {
             return;
         }
 
-        Patching.RunMerge(asmFrom, devLightningPath, dllPaths: dllPaths, true, true);
+        Patching.RunMerge(asmFrom, devLightningPath, dllPaths: dllPaths, true, true, mergeXML);
         Console.WriteLine();
     }
 

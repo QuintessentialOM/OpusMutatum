@@ -10,7 +10,7 @@ public static class Patching {
     public static string PathToPatchingDependencies = "";
 
 
-    public static void RunMerge(string asmFrom, string asmTo = null, OrderedDictionary<string, string> dllPaths = null, bool mergeDllMvids = false, bool removeConflictingTypes = false) {
+    public static void RunMerge(string asmFrom, string asmTo = null, OrderedDictionary<string, string> dllPaths = null, bool mergeDllMvids = false, bool removeConflictingTypes = false, bool moveXmlDocumentation = false) {
 
         asmTo ??= asmFrom;
         dllPaths ??= [];
@@ -22,7 +22,7 @@ public static class Patching {
             Environment.SetEnvironmentVariable("MONOMOD_DEPDIRS", PathToPatchingDependencies);
             Environment.SetEnvironmentVariable("MONOMOD_DEPENDENCY_MISSING_THROW", "0");
 
-            RunMergeModder(asmFrom, asmTmp, dllPaths, removeConflictingTypes);
+            string moduleName = RunMergeModder(asmFrom, asmTmp, dllPaths, removeConflictingTypes);
 
             if (mergeDllMvids) {
                 string asmTmp2 = Path.Combine(Globals.PathToTemporaryOutput, "2_" + Path.GetFileName(asmTo));
@@ -33,13 +33,27 @@ public static class Patching {
                 File.Move(asmTmp2, asmTo, overwrite: true);
             } else
                 File.Move(asmTmp, asmTo, overwrite: true);
+            if (moveXmlDocumentation) {
+                var task = System.Threading.Tasks.Task.Run(async () => {
+                    var XDoc = AssemblyDocumentation.Merge([.. dllPaths.Values], moduleName);
+                    var path = Path.ChangeExtension(asmTo, ".xml");
+                    if (File.Exists(path)) {
+                        File.Delete(path);
+                    }
+                    var file = File.CreateText(path);
+                    file.Write(XDoc.ToString());
+                    file.Flush();
+                    file.Close();
+                });
+            }
         } finally {
             File.Delete(asmTmp);
             File.Delete(Path.ChangeExtension(asmTmp, "pdb"));
             File.Delete(Path.ChangeExtension(asmTmp, "mdb"));
         }
     }
-    public static void RunMergeModder(string asmFrom, string asmTo, OrderedDictionary<string, string> dllPaths = null, bool removeConflictingTypes = false) {
+    public static string RunMergeModder(string asmFrom, string asmTo, OrderedDictionary<string, string> dllPaths = null, bool removeConflictingTypes = false) {
+        string moduleName = "";
         try {
 
             using (MergeModder modder = new() {
@@ -59,10 +73,12 @@ public static class Patching {
                 modder.PostPatchAssembly(removeConflictingTypes);
                 modder.Write(null, null);
                 modder.Log("[Main] Done.");
+                moduleName = Path.GetFileNameWithoutExtension(modder.Module.Name);
             }
         } catch {
             if (File.Exists(asmTo) && asmTo != asmFrom) File.Delete(asmTo);
             throw;
         }
+        return moduleName;
     }
 }

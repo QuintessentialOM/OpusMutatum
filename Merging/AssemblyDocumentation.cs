@@ -4,6 +4,15 @@ using System.Xml.Linq;
 
 namespace OpusMutatum.Merging;
 public static class AssemblyDocumentation {
+    public static string PathToDocumentation = "documentation";
+
+    public static string[] GetDefaultFiles() {
+        string dirPath = Path.Combine(Remapping.PathToMappings, PathToDocumentation);
+        if (File.Exists(dirPath))
+            return [.. Directory.GetFiles(dirPath).Where(file => Path.GetExtension(file) == ".xml")];
+        Directory.CreateDirectory(dirPath);
+        return [];
+    }
 
     public static XDocument Merge(string[] dllPaths, string assemblyName) {
         return Merge([.. dllPaths.SelectMany(path => {

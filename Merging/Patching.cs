@@ -35,7 +35,7 @@ public static class Patching {
                 File.Move(asmTmp, asmTo, overwrite: true);
             if (moveXmlDocumentation) {
                 var task = System.Threading.Tasks.Task.Run(async () => {
-                    var XDoc = AssemblyDocumentation.Merge([.. dllPaths.Values], moduleName);
+                    var XDoc = AssemblyDocumentation.Merge([.. AssemblyDocumentation.GetDefaultFiles(),.. dllPaths.Values], moduleName);
                     var path = Path.ChangeExtension(asmTo, ".xml");
                     if (File.Exists(path)) {
                         File.Delete(path);

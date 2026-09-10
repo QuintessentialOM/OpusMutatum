@@ -84,6 +84,26 @@ public static class Tasks {
         Console.WriteLine("Creating symlinks...");
         ContentHandling.CreateContentSymlinks();
 
+        if (!File.Exists("steam_appid.txt")){
+            var file = File.CreateText("steam_appid.txt");
+            file.Write("558990");
+            file.Flush();
+            file.Close();
+        }
+        string[] dependecyDlls = [
+            "libogg-0.dll",
+            "libpng16-16.dll",
+            "libvorbis-0.dll",
+            "libvorbisfile.dll",
+            "Renderer_D3D11.dll",
+            "SDL2.dll",
+            "SDL2_image.dll",
+            "steam_api64.dll"
+        ];
+        foreach (var file in dependecyDlls) {
+            if (!File.Exists(Path.Combine(Globals.PathToOutput, file)) && File.Exists(file))
+                File.Copy(file, Path.Combine(Globals.PathToOutput, file));
+        }
         Console.WriteLine();
     } // TODO: add caching
 
@@ -244,7 +264,7 @@ public static class Tasks {
         Console.WriteLine($"Running {Path.GetFileName(target)}...");
 
         DependencyHandling.SetupNativeLibLoading();
-        AppHosting.RunAssembly(target, gameDebugger.runArgs, debugger: gameDebugger);
+        AppHosting.RunAssembly(target, gameDebugger.runArgs, debugger: gameDebugger, throwOnInternalError: true);
     }
 
     public static void HandleCopy(string[] args) {

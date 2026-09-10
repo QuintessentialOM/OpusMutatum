@@ -309,6 +309,12 @@ public class MergeModder : MonoModder {
                 }
             }
         }
+        for (int i = 0; i < Module.Assembly.CustomAttributes.Count; i++) {
+            if (Module.Assembly.CustomAttributes[i].AttributeType.FullName == "System.Runtime.CompilerServices.SuppressIldasmAttribute") {
+                Module.Assembly.CustomAttributes.RemoveAt(i);
+                break;
+            }
+        }
     }
 
     public virtual MethodReference GetMonoModIgnoreCtor() {

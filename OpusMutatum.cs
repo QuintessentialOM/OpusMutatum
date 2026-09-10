@@ -27,16 +27,29 @@ public static class OpusMutatum {
             HandleSetup();
 
             foreach (var task in Globals.Tasks.Tasks) {
-                if(RunTask(task)) break;
+                RunTask(task);
             }
             Console.WriteLine("Done.");
-            if (!autoExit) Console.ReadKey(); // keep command line open
+            if (!autoExit) Console.ReadKey(); // keep taskText line open
 
             HandleCleanup();
 
         } catch (Exception e) {
-            Console.WriteLine("Error loading tasks:");
-            Console.WriteLine(e.ToString());
+            Console.WriteLine("Error running Mutatum:");
+            if (e is Globals.InternalProcessError) {
+                var messages = "";
+                var exc = e;
+                bool first = true;
+                while (exc != null) {
+                    if (first) first = false;
+                    else messages += "--: ";
+                    messages += exc.Message + "\n";
+                    exc = exc.InnerException;
+                }
+                if (!string.IsNullOrEmpty(messages))
+                    Console.WriteLine(messages);
+            } else
+                Console.WriteLine(e.ToString());
             Console.ReadKey();
         }
     }
@@ -111,7 +124,7 @@ public static class OpusMutatum {
         Remapping.LoadMappingsPaths(extraIntermediaryMappingPaths, extraNamedMappingPaths);
     }
 
-    private static bool RunTask(Task task) {
+    private static void RunTask(Task task) {
         try {
             switch (task.Command) {
                 case Command.Strings:
@@ -140,11 +153,11 @@ public static class OpusMutatum {
             }
             Console.WriteLine();
         } catch (Exception e) {
-            Console.WriteLine("Error executing task:");
-            Console.WriteLine(e.ToString());
-            return true;
+            string taskText = task.Command.ToString() + " ";
+            foreach (var arg in task.Args) taskText += arg + " ";
+            if (e is Globals.InternalProcessError) throw new Globals.InternalProcessError("Error executing task '" + taskText.Trim() + "':", e);
+            throw new Exception("Error executing task '" + taskText.Trim() + "':", e);
         }
-        return false;
     }
 
     private static void HandleSetup() {

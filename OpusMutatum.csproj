@@ -12,10 +12,4 @@
 	<PackageReference Include="MonoMod.Utils" Version="25.0.14" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Compile Remove="Coreifier\**\*.*" />
-    <EmbeddedResource Remove="Coreifier\**\*.*" />
-    <None Remove="Coreifier\**\*.*" />
-  </ItemGroup>
-
 </Project>

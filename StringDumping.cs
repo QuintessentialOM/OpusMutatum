@@ -32,7 +32,7 @@ public static class StringDumping {
     }
 
     public static void RunStringDumperAndAddPath(string stringDumperPath) {
-        AppHosting.RunExe(stringDumperPath);
+        AppHosting.RunExe(stringDumperPath, true);
 
         var def = AssemblyDefinition.ReadAssembly(stringDumperPath);
         Guid mvid = def.GetMvid();

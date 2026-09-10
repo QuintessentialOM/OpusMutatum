@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Mono.Cecil;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -8,7 +9,9 @@ namespace OpusMutatum;
 public static class TaskParser {
 
     static readonly string tasksFileName = "tasks.txt";
-    static readonly string exampleFileData = "Tasks:\r\n* strings --onlyOnChange\r\n* intermediary --onlyOnChange\r\n* merge --onlyOnChange\r\n* run --readLogs\r\n\r\nAutoExit:\r\n  true";
+    static readonly string exampleFileData = "Tasks:\r\n* strings --onlyOnChange\r\n* intermediary --onlyOnChange\r\n* merge --onlyOnChange --asNamed\r\n* run --readLogs\r\n\r\nAutoExit:\r\n  true";
+
+    private static string tasksCloneTargetPath = "";
     public static MutatumTasks ReadTasksFromFile() {
 
         string tasksFilePath = Path.Combine(Directory.GetCurrentDirectory(), tasksFileName);
@@ -18,7 +21,9 @@ public static class TaskParser {
             using var file = File.CreateText(tasksFilePath);
             file.WriteLine(exampleFileData);
         }
-        return FromFile(tasksFilePath);
+        var tasks = FromFile(tasksFilePath);
+        if (tasksCloneTargetPath != "") CloneTasksTxt(tasksCloneTargetPath);
+        return tasks;
     }
 
     private static MutatumTasks FromFile(string filePath) {
@@ -55,6 +60,8 @@ public static class TaskParser {
                         readingMode = ReadingMode.BoundVSProjects;
                     } else if (line == "AutoExit:") {
                         readingMode = ReadingMode.AutoExit;
+                    } else if (line == "CopyTasksPath:") {
+                        readingMode = ReadingMode.CopyTasksPath;
                     }
                 } else {
                     ReadData(toReturn, readingMode, line.Trim());
@@ -88,8 +95,56 @@ public static class TaskParser {
             case ReadingMode.AutoExit:
                 tasks.AutoExit = line == "true";
                 break;
+            case ReadingMode.CopyTasksPath:
+                tasksCloneTargetPath = line;
+                break;
             default:
                 break;
+        }
+    }
+
+    private static void CloneTasksTxt(string path) {
+        if (Directory.Exists(path)) {
+            path = Path.Combine(path, tasksFileName);
+        } else {
+            path = Path.ChangeExtension(path, ".txt");
+        }
+        if (File.Exists(path))
+            File.Delete(path);
+        string tasksFilePath = Path.Combine(Directory.GetCurrentDirectory(), tasksFileName);
+        using var file = File.CreateText(path);
+        using (StreamReader st = new(tasksFilePath)) {
+            bool commentOut = false;
+            bool isList = false;
+            string line;
+            while ((line = st.ReadLine()) != null) {
+
+            Write:
+                if (!commentOut) {
+                    if (line.TrimStart(' ').StartsWith("CopyTasksPath:")) commentOut = true;
+
+                    if (commentOut) {
+                        file.WriteLine("# " + line.TrimStart(' '));
+                    } else
+                        file.WriteLine(line);
+                } else if (line.TrimStart(' ').StartsWith('#')) {
+                    file.WriteLine(line);
+                } else if (line.TrimStart(' ') == "") {
+                    file.WriteLine(line);
+                    commentOut = false;
+                    isList = false;
+                } else if (line.TrimStart(' ').StartsWith('*')) {
+                    file.WriteLine("#" + line.TrimStart(' ')[1..]);
+                    isList = true;
+                } else if (!isList) {
+                    file.WriteLine("# " + line.TrimStart(' '));
+                    commentOut = false;
+                } else {
+                    commentOut = false;
+                    isList = false;
+                    goto Write;
+                }
+            }
         }
     }
 
@@ -101,7 +156,8 @@ public static class TaskParser {
         ModsDir,
         MappingsDir,
         BoundVSProjects,
-        AutoExit
+        AutoExit,
+        CopyTasksPath
     }
 }
 

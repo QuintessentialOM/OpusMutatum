@@ -2,30 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 
 namespace OpusMutatum;
 
 public static class Coreification {
-    public static string PathToCoreifier = "Coreifier.dll";
-
-    private static bool TryLoadCoreifier(out MethodInfo coreifierEntryPoint) {
-        coreifierEntryPoint = null;
-
-        if (!Globals.TryLoadAssembly(PathToCoreifier, out Assembly coreifierAssembly))
-            return false;
-
-        coreifierEntryPoint = coreifierAssembly?
-            .GetType("Coreifier.Coreifier")?
-            .GetMethod("Coreify", BindingFlags.Public | BindingFlags.Static, null, [typeof(string), typeof(string)], null);
-        if (coreifierEntryPoint is null) {
-            Console.WriteLine("Failed to find coreifier entrypoint.");
-            return false;
-        }
-
-        Console.WriteLine("Found coreifier entrypoint.");
-        return true;
-    }
 
     public static void Coreify(string asmFrom, string asmTo = null, HashSet<string> convertedAsms = null) {
         asmTo ??= asmFrom;
@@ -38,8 +18,8 @@ public static class Coreification {
         if (!convertedAsms.Add(asmFrom))
             return;
 
-        string[] deps = DependencyHandling.GetAssemblyReferences(asmFrom).Keys.ToArray();
-        if (deps.Contains("Coreifier"))
+        string[] deps = [.. DependencyHandling.GetAssemblyReferences(asmFrom).Keys];
+        if (deps.Contains("OpusMutatum"))
             // if the assembly is already coreified, skip it
             return;
 
@@ -60,17 +40,12 @@ public static class Coreification {
     }
 
     private static void CoreifySingle(string asmFrom, string asmTo) {
-        if (!TryLoadCoreifier(out MethodInfo coreifierEntryPoint)) {
-            Console.WriteLine("Unable to load coreifier, skipping coreification!");
-            return;
-        }
-
         Console.WriteLine($"Converting {asmFrom} to .NET Core...");
 
         string asmTmp = Path.Combine(Globals.PathToTemporaryOutput, Path.GetFileName(asmTo));
         try {
             // coreify the assembly to a temporary directory first, then move it to the destination
-            coreifierEntryPoint.Invoke(null, [asmFrom, asmTmp]);
+            Coreifier.Coreifier.Coreify(asmFrom, asmTmp);
             File.Move(asmTmp, asmTo, overwrite: true);
         } finally {
             // delete temporary files

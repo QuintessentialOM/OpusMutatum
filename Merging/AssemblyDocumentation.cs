@@ -8,12 +8,13 @@ public static class AssemblyDocumentation {
 
     public static string[] GetDefaultFiles() {
         string dirPath = Path.Combine(Remapping.PathToMappings, PathToDocumentation);
-        if (File.Exists(dirPath))
+        if (Directory.Exists(dirPath))
             return [.. Directory.GetFiles(dirPath).Where(file => Path.GetExtension(file) == ".xml")];
         Directory.CreateDirectory(dirPath);
         return [];
     }
 
+    // TODO merge with knowledge gathered from assembly merging to replace patch-classes.
     public static XDocument Merge(string[] dllPaths, string assemblyName) {
         return Merge([.. dllPaths.SelectMany(path => {
             try {

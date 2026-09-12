@@ -1,8 +1,6 @@
-﻿using Mono.Cecil;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Threading.Tasks;
 
 namespace OpusMutatum;
 
@@ -50,14 +48,6 @@ public static class TaskParser {
                         readingMode = ReadingMode.Tasks;
                     } else if (line == "DevMods:") {
                         readingMode = ReadingMode.DevMods;
-                    } else if (line == "GameDir:") {
-                        readingMode = ReadingMode.GameDir;
-                    } else if (line == "ModsDir:") {
-                        readingMode = ReadingMode.ModsDir;
-                    } else if (line == "MappingsDir:") {
-                        readingMode = ReadingMode.MappingsDir;
-                    } else if (line == "BoundVSProjects:") {
-                        readingMode = ReadingMode.BoundVSProjects;
                     } else if (line == "AutoExit:") {
                         readingMode = ReadingMode.AutoExit;
                     } else if (line == "CopyTasksPath:") {
@@ -79,18 +69,6 @@ public static class TaskParser {
                 break;
             case ReadingMode.DevMods:
                 tasks.DevModIds.Add(line);
-                break;
-            case ReadingMode.GameDir:
-                tasks.GameDir = line;
-                break;
-            case ReadingMode.ModsDir:
-                tasks.ModsDir = line;
-                break;
-            case ReadingMode.MappingsDir:
-                tasks.MappingsDir = line;
-                break;
-            case ReadingMode.BoundVSProjects:
-                tasks.BoundVSProjects.Add(line);
                 break;
             case ReadingMode.AutoExit:
                 tasks.AutoExit = line == "true";
@@ -152,10 +130,6 @@ public static class TaskParser {
         None,
         Tasks,
         DevMods,
-        GameDir,
-        ModsDir,
-        MappingsDir,
-        BoundVSProjects,
         AutoExit,
         CopyTasksPath
     }
@@ -171,7 +145,6 @@ public class MutatumTasks {
     public bool AutoExit = false;
 
     public List<string> DevModIds = [];
-    public List<string> BoundVSProjects = []; // TODO: not just vs
 }
 
 public class Task {

@@ -1,16 +1,19 @@
+using Mono.Cecil;
+using Mono.Cecil.Cil;
+using Mono.Collections.Generic;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
-using Mono.Cecil;
-using Mono.Cecil.Cil;
-using Mono.Collections.Generic;
+using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace OpusMutatum;
 
-public static class Remapping {
+public static partial class Remapping {
     #region Data Structures
 
 	private class Mappings {
@@ -63,13 +66,15 @@ public static class Remapping {
 	}
 
     private record NamedMappings(Dictionary<string, string> Mappings, Dictionary<string, Dictionary<int, string>> AddedEnumVariants);
+    private record Backmapper(Mappings Mappings, Dictionary<string, Dictionary<int, string>> RemovedEnumVariants);
 
     #endregion
 
     #region Remappers
 
-    private static readonly Dictionary<Guid, Mappings> ObfToIntermediaryMappings = new(); // assembly mvid -> mappings
-    private static readonly Dictionary<Guid, NamedMappings> IntermediaryToNamedMappings = new(); // unique mappings id -> mappings. TODO: refactor named mappings loading
+    private static readonly Dictionary<Guid, Mappings> ObfToIntermediaryMappings = []; // assembly mvid -> mappings
+    private static readonly Dictionary<Guid, NamedMappings> IntermediaryToNamedMappings = []; // unique mappings id -> mappings. TODO: refactor named mappings loading
+    private static readonly Dictionary<Guid, Backmapper> NamedToIntermediaryMappings = []; // combined from the IntermediaryToNamed and ObfToIntermediary mappings ( using Named for obfustacted )
 
     private interface IRemapper {
 		// these methods should return the current name if there is no remapping to be done
@@ -155,7 +160,7 @@ public static class Remapping {
         public string RemapType(TypeReference type)
             => GetNamedForIntermediary(type.Name, type.DeclaringType);
 
-        private string GetNamedForIntermediary(string intermediary, TypeReference owner) {
+        public string GetNamedForIntermediary(string intermediary, TypeReference owner) {
             if (!mappings.TryGetValue(intermediary, out string name))
                 return intermediary;
 
@@ -298,7 +303,7 @@ public static class Remapping {
         return true;
 
     fail:
-        Console.WriteLine("Failed to find valid intermediary mappings!");
+        Console.WriteLine("-<!>- Failed to find valid intermediary mappings!");
         return false;
     }
 
@@ -351,7 +356,7 @@ public static class Remapping {
         IntermediaryToNamedMappings[mvid] = namedMappings;
 
         if (mappings.Count == 0) {
-            Console.WriteLine("Failed to find valid named mappings!");
+            Console.WriteLine("-<!>- Failed to find valid named mappings!");
             return false;
         }
 
@@ -402,6 +407,360 @@ public static class Remapping {
 
         DoRemap(new NamedRemapper(namedMappings.Mappings), allTypes);
     }
+
+
+    #endregion
+
+    #region Backmapping
+
+    public static void RemapNamedToIntermediary(AssemblyDefinition namedAssemblyDef) {
+
+        Globals.TryLoadLightning(out var origAssembly);
+        if (!TryLoadNamedToIntermediaryMappings(origAssembly, out Backmapper backmapper))
+            return;
+
+        var allTypes = StringDumping.CollectNestedTypes(namedAssemblyDef.MainModule.Types);
+
+        EnumVariantInjection.RemoveEnumVariants(allTypes, backmapper.RemovedEnumVariants);
+
+        DoRemap(new IntermediaryRemapper(backmapper.Mappings), allTypes);
+    }
+
+    private static bool TryLoadNamedToIntermediaryMappings(AssemblyDefinition originalAssembly, out Backmapper backmapper) {
+
+        Guid mvid = originalAssembly.GetMvid();
+        if (NamedToIntermediaryMappings.TryGetValue(mvid, out backmapper)) {
+            Console.WriteLine("Found valid named mappings from cache.");
+            return true;
+        }
+
+        TryLoadObfToIntermediaryMappings(originalAssembly, out Mappings oToI);
+        TryLoadIntermediaryToNamedMappings(originalAssembly, out NamedMappings iToN);
+        var namedRemapper = new NamedRemapper(iToN.Mappings);
+
+        Dictionary<string, string> intermediaryTypeNamePairs = [];
+        foreach (var classMapping in oToI.Classes) {
+            intermediaryTypeNamePairs.Add(classMapping.ClassFullNameA, classMapping.ClassNameB);
+        }
+        var mappings = new Mappings {
+            NamespaceA = "named",
+            NamespaceB = oToI.NamespaceB,
+            nextClassIndex = oToI.nextClassIndex,
+            nextEnumIndex = oToI.nextEnumIndex,
+            nextInterfaceIndex = oToI.nextInterfaceIndex,
+            nextStructIndex = oToI.nextStructIndex,
+            nextDelegateIndex = oToI.nextDelegateIndex,
+            nextMethodIndex = oToI.nextMethodIndex,
+            nextParamIndex = oToI.nextParamIndex,
+            Classes = [],
+        };
+        foreach (var classMapping in oToI.Classes){
+            ClassMapping newClM = new() {
+                ClassFullNameA = MapNameFromObfuscatedToNamed(classMapping.ClassFullNameA, classMapping.ClassNameB, namedRemapper),
+                ClassNameB = classMapping.ClassNameB,
+                Methods = [],
+                Fields = [],
+                GenericParameters = [],
+            };
+            foreach (var methodMapping in classMapping.Methods) {
+                MethodMapping newMM = new() {
+                    MethodNameA = MapNameFromObfuscatedToNamed(methodMapping.MethodNameA, methodMapping.MethodNameB, namedRemapper),
+                    MethodNameB = methodMapping.MethodNameB,
+                    ReturnTypeFullNameA = MapNameFromObfuscatedToNamed(methodMapping.ReturnTypeFullNameA, intermediaryTypeNamePairs, namedRemapper, classMapping.GenericParameters),
+                    ArgumentTypeFullNamesA = [],
+                    GenericParameters = [],
+                    Parameters = [],
+                };
+                foreach (var argumentType in methodMapping.ArgumentTypeFullNamesA) {
+                    newMM.ArgumentTypeFullNamesA.Add(MapNameFromObfuscatedToNamed(argumentType, intermediaryTypeNamePairs, namedRemapper, classMapping.GenericParameters));
+                }
+                foreach (var parameter in methodMapping.Parameters) {
+                    newMM.Parameters.Add(new() {
+                        ParameterNameA = MapNameFromObfuscatedToNamed(parameter.ParameterNameA, parameter.ParameterNameB, namedRemapper),
+                        ParameterNameB = parameter.ParameterNameB,
+                    });
+                }
+                foreach (var generic in methodMapping.GenericParameters) {
+                    newMM.GenericParameters.Add(new() {
+                        GenericNameA = MapNameFromObfuscatedToNamed(generic.GenericNameA, generic.GenericNameB, namedRemapper),
+                        GenericNameB = generic.GenericNameB,
+                    });
+                }
+                newClM.Methods.Add(newMM);
+            }
+            foreach (var fieldMapping in classMapping.Fields) {
+                FieldMapping newFldM = new() {
+                    FieldNameA = MapNameFromObfuscatedToNamed(fieldMapping.FieldNameA, fieldMapping.FieldNameB, namedRemapper),
+                    FieldNameB = fieldMapping.FieldNameB,
+                };
+                newClM.Fields.Add(newFldM);
+            }
+            foreach (var generic in classMapping.GenericParameters) {
+                GenericParameterMapping newGenericM = new() {
+                    GenericNameA = MapNameFromObfuscatedToNamed(generic.GenericNameA, generic.GenericNameB, namedRemapper),
+                    GenericNameB = generic.GenericNameB,
+                };
+                newClM.GenericParameters.Add(newGenericM);
+            }
+            mappings.Classes.Add(newClM);
+        }
+        backmapper = new Backmapper(mappings, iToN.AddedEnumVariants);
+        NamedToIntermediaryMappings[mvid] = backmapper;
+        return false;
+    }
+
+    private static string MapNameFromObfuscatedToNamed(string obfuscated, string intermediary, NamedRemapper remapper) {
+        return intermediary != null ? remapper.GetNamedForIntermediary(intermediary, null) : obfuscated;
+    }
+    private static string MapNameFromObfuscatedToNamed(string obfuscated, Dictionary<string, string> intermediaryTypeNamePairs, NamedRemapper remapper, List<GenericParameterMapping> generics) {
+        if (obfuscated == null) return null;
+        var splits = obfuscated.Split("#=");
+        if (splits.Length == 1) return obfuscated;
+
+        StringBuilder builder = new(splits[0]);
+        string storage = "";
+        if (builder.ToString().EndsWith('/')) {
+            storage = builder.ToString().Split(['/', ',', '\u0026', '\u003C', '[', ']'])[^2] + "/";
+        }
+        foreach (var item in splits[1..]) {
+            string key;
+            if (item.Split("==").Length > 1) {
+                key = "==";
+            } else if (item.Split("=").Length > 1) {
+                key = "=";
+            } else throw new Exception();
+            string origName = "#=" + item.Split(key)[0] + key; // Split must have a count of 2.
+            string name = storage + origName;
+            if (item.Split(key)[1] == "/") {
+                storage += "#=" + item;
+            } else {
+                storage = "";
+            }
+
+            string nameOrig = name;
+            var generic = generics.SingleOrDefault(generic => generic.GenericNameA == name, null);
+            if (generic != null) {
+                name = MapNameFromObfuscatedToNamed(generic.GenericNameB, generic.GenericNameB, remapper);
+            } else if (intermediaryTypeNamePairs.TryGetValue(name, out var intermediary)) {
+                name = MapNameFromObfuscatedToNamed(intermediary, intermediary, remapper);
+            }
+            if (name != nameOrig)
+                builder.Append(name);
+            else builder.Append(origName);
+            builder.Append(item.Split(key)[1]);
+        }
+        return builder.ToString();
+    }
+
+    #endregion
+
+    #region Xml
+
+    public static XDocument MapXmlDocument(XDocument xml) {
+        Globals.TryLoadLightning(out var origAssembly);
+        TryLoadIntermediaryToNamedMappings(origAssembly, out var mappings);
+        var mapped = MapXmlDocument(xml, mappings);
+        return mapped;
+    }
+    public static XDocument BackmapXmlDocument(XDocument xml) {
+        Globals.TryLoadLightning(out var origAssembly);
+        TryLoadNamedToIntermediaryMappings(origAssembly, out var mappings);
+        var mapped = MapXmlDocument(xml, mappings.Mappings);
+        //var path = Path.Combine(PathToMappings, "documentation.xml");
+        //if (File.Exists(path)) {
+        //    File.Delete(path);
+        //}
+        //var file = File.CreateText(path);
+        //file.Write(mapped.ToString());
+        //file.Flush();
+        //file.Close();
+        return mapped;
+    }
+    private static XDocument MapXmlDocument(XDocument xml, Mappings mappings) {
+        var remapped = RemapXmlAfter(xml, mappings, "member name=\"", true);
+        return RemapXmlAfter(remapped, mappings, "cref=\"", false);
+        // TODO "!:" expressions.
+    }
+    private static XDocument MapXmlDocument(XDocument xml, NamedMappings mappings) {
+        string doc = xml.ToString();
+        List<string> orderedKeys = []; 
+        foreach (var pair in mappings.Mappings) {
+            orderedKeys.Add(pair.Key);
+        }
+        orderedKeys.Sort();
+        for (int i = orderedKeys.Count - 1; i >= 0; i--) {
+            doc = doc.Replace(orderedKeys[i], mappings.Mappings[orderedKeys[i]]);
+            // We'll just ignore that a few other miscellaneous things might get replaced.
+            // It's a feature, not a bug!
+        }
+        return XDocument.Parse(doc);
+    }
+
+    private static XDocument RemapXmlAfter(XDocument xml, Mappings mappings, string after, bool enableParamMapping) {
+
+        string doc = xml.ToString();
+        var split1 = doc.Split(after);
+
+        StringBuilder builder = new(split1[0]);
+        foreach (var split in split1[1..]) {
+            builder.Append(after);
+            XmlDocItemType itemType;
+            if (split.StartsWith("T:")) {
+                builder.Append("T:");
+                itemType = XmlDocItemType.Type;
+            } else if (split.StartsWith("M:")) {
+                builder.Append("M:");
+                itemType = XmlDocItemType.Method;
+            } else if (split.StartsWith("F:")) {
+                builder.Append("F:");
+                itemType = XmlDocItemType.Field;
+            } else {
+                builder.Append(split);
+                continue;
+            }
+            var parsed = split.Split('"')[0][2..];
+
+            string[] arguments = [];
+            if (itemType == XmlDocItemType.Method) {
+                var split2 = parsed.Split('(');
+                if (split2.Length > 1) {
+                    arguments = split2[1].TrimEnd(')').Split(',');
+                }
+                parsed = split2[0];
+            }
+
+            builder.Append(GetMappedXml(parsed.Split('.'), mappings, itemType, arguments, out var methodParamMapping, out var typeParamMapping));
+
+            if (arguments.Length > 0) {
+                builder.Append('(');
+
+                for (int i = 0; i < arguments.Length; i++) {
+                    builder.Append(GetMappedXml(arguments[i].Split('.'), mappings, XmlDocItemType.Type, null, out var _, out var _));
+                    builder.Append(',');
+                }
+                builder.Remove(builder.Length - 1, 1);
+                builder.Append(')');
+            }
+            string remainder = split[split.Split('"')[0].Length..];
+            if (enableParamMapping && methodParamMapping.Count > 0) {
+                remainder = RemapXmlParamsAfter(remainder, methodParamMapping, "param name=\"");
+                remainder = RemapXmlParamsAfter(remainder, methodParamMapping, "paramref name=\"");
+            }
+            if (enableParamMapping && typeParamMapping.Count > 0) {
+                remainder = RemapXmlParamsAfter(remainder, typeParamMapping, "typeparam name=\"");
+                remainder = RemapXmlParamsAfter(remainder, typeParamMapping, "typeparamref name=\"");
+            }
+            builder.Append(remainder);
+
+        }
+        return XDocument.Parse(builder.ToString());
+    }
+    private static string RemapXmlParamsAfter(string remainder, Dictionary<string, string> paramMapping, string after) {
+        var split1 = remainder.Split(after);
+        StringBuilder builder = new(split1[0]);
+        foreach (var split in split1[1..]) {
+            builder.Append(after);
+            var parsed = split.Split('"')[0];
+
+            if (paramMapping.TryGetValue(parsed, out var mapped)) {
+                builder.Append(mapped);
+            } else builder.Append(parsed);
+
+            builder.Append(split[split.Split('"')[0].Length..]);
+        }
+        return builder.ToString();
+    }
+
+    private static string GetMappedXml(string[] origTypes, Mappings mappings, XmlDocItemType type, string[] arguments, out Dictionary<string, string> methodParamMapping, out Dictionary<string, string> typeParamMapping) {
+        methodParamMapping = [];
+        typeParamMapping = [];
+        StringBuilder builder = new();
+        ClassMapping classMapping = null;
+        for (int i = 0; i < origTypes.Length -1; i++) {
+            builder.Append(GetMappedXmlTypeWithGenerics(origTypes[i], mappings, out classMapping));
+            builder.Append('.');
+        }
+        string last = origTypes[^1];
+        switch (type) {
+            default:
+            case XmlDocItemType.Type:
+                if (classMapping != null) {
+                    foreach (var param in classMapping.GenericParameters) {
+                        typeParamMapping[param.GenericNameA] = param.GenericNameB;
+                    }
+                }
+                builder.Append(GetMappedXmlTypeWithGenerics(last, mappings, out classMapping));
+                if (classMapping != null) {
+                    foreach (var param in classMapping.GenericParameters) {
+                        typeParamMapping[param.GenericNameA] = param.GenericNameB;
+                    }
+                }
+                break;
+            case XmlDocItemType.Field:
+                var mappingF = classMapping?.Fields.SingleOrDefault(fl => fl.FieldNameA == last, null);
+                builder.Append(mappingF?.FieldNameB ?? last);
+                if (classMapping != null) {
+                    foreach (var param in classMapping.GenericParameters) {
+                        typeParamMapping[param.GenericNameA] = param.GenericNameB;
+                    }
+                }
+                break;
+            case XmlDocItemType.Method:
+                var mappingM = classMapping?.Methods.SingleOrDefault(md => {
+                    bool isMatching = md.MethodNameA == last && md.Parameters.Count == arguments.Length;
+                    if (isMatching) {
+                        for (int i = 0; i < arguments.Length; i++) {
+                            string substituted = XmlMethodArgumentRegex().Replace(md.ArgumentTypeFullNamesA[i].Replace(">", "}"), "{");
+                            if (substituted != arguments[i]) return false;
+                        }
+                    }
+                    return isMatching;
+                }, null);
+                builder.Append(mappingM?.MethodNameB ?? last);
+                if (classMapping != null) {
+                    foreach (var param in classMapping.GenericParameters) {
+                        typeParamMapping[param.GenericNameA] = param.GenericNameB;
+                    }
+                }
+                if (mappingM != null) {
+                    foreach (var param in mappingM.Parameters) {
+                        methodParamMapping[param.ParameterNameA] = param.ParameterNameB;
+                    }
+                    foreach (var param in mappingM.GenericParameters) {
+                        typeParamMapping[param.GenericNameA] = param.GenericNameB;
+                    }
+                }
+                break;
+        }
+        return builder.ToString();
+    }
+    private static string GetMappedXmlTypeWithGenerics(string orig, Mappings mappings, out ClassMapping classMapping) {
+
+        string[] split = orig.Split('{');
+        classMapping = mappings.Classes.SingleOrDefault(cl => cl.ClassFullNameA == split[0], null);
+        StringBuilder builder = new(classMapping?.ClassNameB ?? split[0] );
+        if (split.Length > 1) {
+            builder.Append('{');
+            split = split[1].TrimEnd('}').Split(',');
+            foreach (var item in split) {
+                builder.Append (GetMappedXml(item.Split('.'), mappings, XmlDocItemType.Type, null, out var _, out var _));
+                builder.Append(',');
+            }
+            builder.Remove(builder.Length - 1, 1);
+            builder.Append('}');
+        }
+        return builder.ToString();
+    }
+
+    private enum XmlDocItemType {
+        None,
+        Type,
+        Field,
+        Method,
+    }
+
+    [GeneratedRegex(@"`\d+<")]
+    private static partial Regex XmlMethodArgumentRegex();
 
     #endregion
 }

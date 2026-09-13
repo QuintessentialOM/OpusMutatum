@@ -10,7 +10,7 @@ public static class Patching {
     public static string PathToPatchingDependencies = "";
 
 
-    public static void RunMerge(string asmFrom, string asmTo = null, OrderedDictionary<string, string> dllPaths = null, bool mergeDllMvids = false, bool removeConflictingTypes = false, bool moveXmlDocumentation = false) {
+    public static void RunMerge(string asmFrom, string asmTo = null, OrderedDictionary<ModMeta, string> dllPaths = null, bool mergeDllMvids = false, bool removeConflictingTypes = false, bool moveXmlDocumentation = false) {
 
         asmTo ??= asmFrom;
         dllPaths ??= [];
@@ -35,7 +35,7 @@ public static class Patching {
                 File.Move(asmTmp, asmTo, overwrite: true);
             if (moveXmlDocumentation) {
                 var task = System.Threading.Tasks.Task.Run(async () => {
-                    var XDoc = AssemblyDocumentation.Merge([.. AssemblyDocumentation.GetDefaultFiles(),.. dllPaths.Values], moduleName);
+                    var XDoc = AssemblyDocumentation.Merge(dllPaths, moduleName);
                     var path = Path.ChangeExtension(asmTo, ".xml");
                     if (File.Exists(path)) {
                         File.Delete(path);
@@ -52,7 +52,7 @@ public static class Patching {
             File.Delete(Path.ChangeExtension(asmTmp, "mdb"));
         }
     }
-    public static string RunMergeModder(string asmFrom, string asmTo, OrderedDictionary<string, string> dllPaths = null, bool removeConflictingTypes = false) {
+    public static string RunMergeModder(string asmFrom, string asmTo, OrderedDictionary<ModMeta, string> dllPaths = null, bool removeConflictingTypes = false) {
         string moduleName = "";
         try {
 

@@ -20,12 +20,10 @@ public class ModMeta {
     public string[] Conflicts { get; set; } = [];
 
 
-    [JsonIgnore]
-    public string PathToDirectory;
-    [JsonIgnore]
-    public string PathToArchive;
-    [JsonIgnore]
-    public bool HasDll;
+    [JsonIgnore] public string OldMappings;
+    [JsonIgnore] public string PathToDirectory;
+    [JsonIgnore] public string PathToArchive;
+    [JsonIgnore] public bool HasDll;
 }
 
 

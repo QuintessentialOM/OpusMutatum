@@ -1,6 +1,7 @@
 using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Mono.Collections.Generic;
+using MonoMod.Utils;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -73,7 +74,7 @@ public static partial class Remapping {
     #region Remappers
 
     private static readonly Dictionary<Guid, Mappings> ObfToIntermediaryMappings = []; // assembly mvid -> mappings
-    private static readonly Dictionary<Guid, NamedMappings> IntermediaryToNamedMappings = []; // unique mappings id -> mappings. TODO: refactor named mappings loading
+    private static Tuple<Version, NamedMappings> IntermediaryToNamedMappings = null; // unique mappings id -> mappings. //TODO: refactor named mappings loading
     private static readonly Dictionary<Guid, Backmapper> NamedToIntermediaryMappings = []; // combined from the IntermediaryToNamed and ObfToIntermediary mappings ( using Named for obfustacted )
 
     private interface IRemapper {
@@ -83,11 +84,19 @@ public static partial class Remapping {
 		string RemapMethod(MethodReference method);
 		string RemapMethodParam(ParameterReference param, MethodReference method);
 		string RemapGeneric(GenericParameter generic);
-	}
+        string RemapTypeByFullName(string fullName);
+        string RemapMethodByTypeAndName(string declaringTypeFullName, string Name, string[] methodParams = null);
+        string RemapFieldByTypeAndName(string declaringTypeFullName, string Name);
+    }
 
     private class IntermediaryRemapper(Mappings mappings) : IRemapper {
         public string RemapField(FieldReference field)
             => FindType(field.DeclaringType)?.Fields.Where(f => f.FieldNameA == field.Name).SingleOrNull()?.FieldNameB ?? field.Name;
+
+        public string RemapFieldByTypeAndName(string declaringTypeFullName, string Name) {
+            RemapTypeByFullName(declaringTypeFullName, out var lastClass);
+            return lastClass?.Fields.Where(method => method.FieldNameA == Name).SingleOrNull()?.FieldNameB ?? Name;
+        }
 
         public string RemapGeneric(GenericParameter generic)
             => generic.Type == GenericParameterType.Method
@@ -96,14 +105,77 @@ public static partial class Remapping {
                 : FindType(generic.DeclaringType)?.GenericParameters.Where(g => g.GenericNameA == generic.Name)
                     .SingleOrNull()?.GenericNameB ?? generic.Name;
 
-        public string RemapMethod(MethodReference method)
-            => FindMethod(method)?.MethodNameB ?? method.Name;
+        public string RemapMethod(MethodReference method) {
+            if (!method.Name.StartsWith("orig_"))
+                return FindMethod(method)?.MethodNameB ?? method.Name;
+            string toReturn = FindMethod(method, method.Name[5..])?.MethodNameB;
+            return toReturn == null ? method.Name : "orig_" + toReturn;
+        }
 
-        public string RemapMethodParam(ParameterReference param, MethodReference method)
-            => FindMethod(method)?.Parameters.Where(p => p.ParameterNameA == param.Name).SingleOrNull()?.ParameterNameB ?? param.Name;
+        public string RemapMethodByTypeAndName(string declaringTypeFullName, string Name, string[] methodParams = null) {
+            RemapTypeByFullName(declaringTypeFullName, out var lastClass);
+            return lastClass?.Methods.Where(method => {
+                if(method.MethodNameA != Name) return false;
+                if (methodParams != null) {
+                    if (methodParams.Length != method.ArgumentTypeFullNamesA.Count) return false;
+                    for (int i = 0; i < methodParams.Length; i++) {
+                        if (methodParams[i] != method.ArgumentTypeFullNamesA[i]) return false;
+                    }
+                }
+                return true;
+            }).SingleOrNull()?.MethodNameB ?? Name;
+        }
 
-        public string RemapType(TypeReference type)
-            => FindType(type)?.ClassNameB ?? type.Name;
+        public string RemapMethodParam(ParameterReference param, MethodReference method) {
+            if (!method.Name.StartsWith("orig_"))
+                return FindMethod(method)?.Parameters.Where(p => p.ParameterNameA == param.Name).SingleOrNull()?.ParameterNameB ?? param.Name;
+            return FindMethod(method, method.Name[5..])?.Parameters.Where(p => p.ParameterNameA == param.Name).SingleOrNull()?.ParameterNameB ?? param.Name;
+        }
+
+        public string RemapType(TypeReference type) {
+            if (type.GetPatchFullName() == type.FullName)
+                return FindType(type)?.ClassNameB ?? type.Name;
+            if (type.Name.StartsWith("<>c")) return type.Name;
+            string toReturn = FindType(type)?.ClassNameB;
+            return toReturn == null ? type.Name : "patch_" + toReturn;
+        }
+
+        public string RemapTypeByFullName(string fullName) {
+            return RemapTypeByFullName(fullName, out var _);
+        }
+        public string RemapTypeByFullName(string fullName, out ClassMapping lastClass) {
+            lastClass = null;
+            var split = fullName.Split('/');
+            StringBuilder splitBuilder = new();
+            StringBuilder builder = new();
+            for (int i = 0; i < split.Length; i++) {
+                if (i != 0) {
+                    builder.Append('/');
+                    splitBuilder.Append('/');
+                }
+                splitBuilder.Append(split[i]);
+                if (split[i].Contains('<')) {
+                    string fullGeneric = split[i];
+                    while (fullGeneric.Count('<') != fullGeneric.Count('>')) {
+                        i++;
+                        fullGeneric += "/" + split[i];
+                    }
+                    var mainGeneric = fullGeneric.Split('<')[0];
+                    var genericSplit = fullGeneric[(mainGeneric.Length + 1)..].TrimEnd('>').Split(',');
+                    StringBuilder genericBuilder = new(RemapTypeByFullName(mainGeneric, out var _) + "<");
+                    for (int j = 0; j < genericSplit.Length; j++) {
+                        if (j != 0) genericBuilder.Append(',');
+                        genericBuilder.Append(RemapTypeByFullName(genericSplit[j], out var _));
+                    }
+                    genericBuilder.Append('>');
+                    builder.Append(genericBuilder);
+                } else {
+                    lastClass = mappings.Classes.Where(cls => cls.ClassFullNameA == splitBuilder.ToString()).SingleOrNull();
+                    builder.Append(lastClass?.ClassNameB ?? split[i]);
+                }
+            }
+            return builder.ToString();
+        }
 
         private TypeReference GetMainType(TypeReference type) {
             if (type.IsGenericParameter)
@@ -117,14 +189,15 @@ public static partial class Remapping {
 
         private ClassMapping FindType(TypeReference type) {
             type = GetMainType(type); // Ignore generics, array types, reference types, etc
-            return mappings.Classes.Where(cls => cls.ClassFullNameA == type.FullName).SingleOrNull();
+            return mappings.Classes.Where(cls => cls.ClassFullNameA == type.GetPatchFullName()).SingleOrNull();
         }
 
-        private MethodMapping FindMethod(MethodReference method)
+        private MethodMapping FindMethod(MethodReference method, string nameOverride = null) {
+            nameOverride ??= method.Name;
             // TODO: generic params stripped when matching method signatures due to Cecil handling generic instance method references strangely
             // probably not ideal, but maybe it's fine?
-                        => FindType(method.DeclaringType)?.Methods.Where(m => {
-                if (m.MethodNameA != method.Name || m.ArgumentTypeFullNamesA.Count != method.Parameters.Count || m.GenericParameters.Count != method.GenericParameters.Count)
+            return FindType(method.DeclaringType)?.Methods.Where(m => {
+                if (m.MethodNameA != nameOverride || m.ArgumentTypeFullNamesA.Count != method.Parameters.Count || m.GenericParameters.Count != method.GenericParameters.Count)
                     return false;
                 var paramTypes = method.Parameters.Select(p => p.ParameterType.FullName).ToList();
                 var returnType = method.ReturnType.FullName;
@@ -139,11 +212,16 @@ public static partial class Remapping {
                     && m.ArgumentTypeFullNamesA.Zip(paramTypes, (a, b) => (a, b))
                         .All(pair => pair.a == pair.b);
             }).SingleOrNull();
+        }
     }
 
     private class NamedRemapper(Dictionary<string, string> mappings) : IRemapper {
         public string RemapField(FieldReference field)
             => GetNamedForIntermediary(field.Name, field.DeclaringType);
+
+        public string RemapFieldByTypeAndName(string declaringTypeFullName, string Name) {
+            return GetNamedForIntermediary(Name, null);
+        }
 
         public string RemapGeneric(GenericParameter generic)
             => GetNamedForIntermediary(generic.Name,
@@ -151,14 +229,54 @@ public static partial class Remapping {
                     ? generic.DeclaringMethod.DeclaringType
                     : generic.DeclaringType);
 
-        public string RemapMethod(MethodReference method)
-            => GetNamedForIntermediary(method.Name, method.DeclaringType);
+        public string RemapMethod(MethodReference method) {
+            if (method.Name.StartsWith("orig_"))
+                return "orig_" + GetNamedForIntermediary(method.Name[5..], method.DeclaringType);
+            return GetNamedForIntermediary(method.Name, method.DeclaringType);
+        }
+
+        public string RemapMethodByTypeAndName(string declaringTypeFullName, string Name, string[] methodParams = null) {
+            return GetNamedForIntermediary(Name.Split('<')[0], null);
+        }
 
         public string RemapMethodParam(ParameterReference param, MethodReference method)
             => GetNamedForIntermediary(param.Name, method.DeclaringType);
 
-        public string RemapType(TypeReference type)
-            => GetNamedForIntermediary(type.Name, type.DeclaringType);
+        public string RemapType(TypeReference type) {
+            if (type.GetPatchFullName() != type.FullName) {
+                if (type.Name.StartsWith("patch_")) {
+                    return "patch_" + GetNamedForIntermediary(type.Name[6..], type.DeclaringType);
+                }
+
+            }
+            return GetNamedForIntermediary(type.Name, type.DeclaringType);
+        }
+
+        public string RemapTypeByFullName(string fullName) {
+            var split = fullName.Split('/');
+            StringBuilder builder = new();
+            for (int i = 0; i < split.Length; i++) {
+                if (i != 0) builder.Append('/');
+                if (split[i].Contains('<')) {
+                    string fullGeneric = split[i];
+                    while (fullGeneric.Count('<') != fullGeneric.Count('>')) {
+                        i++;
+                        fullGeneric += "/" + split[i];
+                    }
+                    var mainGeneric = fullGeneric.Split('<')[0].TrimEnd('`');
+                    var genericSplit = fullGeneric.Split('<')[1].TrimEnd('>').Split(',');
+                    StringBuilder genericBuilder = new(RemapTypeByFullName(mainGeneric) + "<");
+                    for (int j = 0; j < genericSplit.Length; j++) {
+                        if (j != 0) genericBuilder.Append(',');
+                        genericBuilder.Append(RemapTypeByFullName(genericSplit[j]));
+                    }
+                    genericBuilder.Append('>');
+                    builder.Append(genericBuilder);
+                } else
+                    builder.Append(GetNamedForIntermediary(split[i], null));
+            }
+            return builder.ToString();
+        }
 
         public string GetNamedForIntermediary(string intermediary, TypeReference owner) {
             if (!mappings.TryGetValue(intermediary, out string name))
@@ -224,7 +342,30 @@ public static partial class Remapping {
                                 deferredRenames[arg.Value as TypeReference] =
                                     remapper.RemapType(arg.Value as TypeReference);
 
+                if (method.GetCustomAttribute("MonoMod.MonoModILInject") is CustomAttribute ilAttrib) {
+                    ilAttrib.MapAttributeAsMethodAt(0, remapper, type);
+                }
+                if (method.GetCustomAttribute("MonoMod.MonoModWrapOperation") is CustomAttribute woAttrib) {
+                    woAttrib.MapAttributeAsMethodAt(0, remapper, type);
+                    var woType = woAttrib.GetAttributeValue(1);
+                    var target = woAttrib.GetAttributeValue(2);
+                    if (!target.Contains('.') && (woType == "Call" || woType == "New" || woType.StartsWith("Field"))) {
+                        var split = target.Split("::");
+                        var woTargetType = remapper.RemapTypeByFullName(split[0]);
+                        if (split.Length > 0) {
+                            if (woType == "Call") {
+                                woTargetType += "::" + remapper.RemapMethodByTypeAndName(split[0], split[1]);
+                            } else {
+                                woTargetType += "::" + remapper.RemapFieldByTypeAndName(split[0], split[1]);
+                            }
+                        }
+                        woAttrib.SetAttributeValue(2, woTargetType);
+                    }
+                }
                 // TODO: map locals
+            }
+            if (type.GetCustomAttribute("MonoMod.MonoModPatch") is CustomAttribute patchAttrib) {
+                patchAttrib.SetAttributeValue(0, remapper.RemapTypeByFullName(patchAttrib.GetAttributeValue(0)));
             }
 
             foreach (FieldDefinition field in type.Fields)
@@ -237,6 +378,36 @@ public static partial class Remapping {
             mref.Name = newName;
         foreach ((ParameterReference pref, string newName) in deferredParamRenames)
             pref.Name = newName;
+    }
+
+    private static void SetAttributeValue(this CustomAttribute attribute, int index, string newValue) {
+        attribute.ConstructorArguments[index] = new CustomAttributeArgument(attribute.ConstructorArguments[index].Type, newValue);
+    }
+    private static string GetAttributeValue(this CustomAttribute attribute, int index) {
+        return (string)attribute.ConstructorArguments[index].Value;
+    }
+
+    private static void MapAttributeAsMethodAt(this CustomAttribute attribute, int index, IRemapper remapper, TypeDefinition patchDeclaringType) {
+        string orig = attribute.GetAttributeValue(index);
+        if (!orig.Contains(' ') && !orig.Contains(':') && !orig.Contains('(')) {
+            var ptFlN = patchDeclaringType.GetPatchFullName();
+            attribute.SetAttributeValue(index, remapper.RemapMethodByTypeAndName(ptFlN, orig));
+            return;
+        }
+        var split = orig.Split(' ');
+        var returnType = remapper.RemapTypeByFullName(split[0]);
+        split = split[1].Split('(');
+        var origMethod = split[0].Split("::");
+        var origParams = split[1].TrimEnd(')').Split(',');
+        if (origParams.Length == 1 && origParams[0] == "") origParams = [];
+        var method = remapper.RemapTypeByFullName(origMethod[0]) + "::" + remapper.RemapMethodByTypeAndName(origMethod[0], origMethod[1], origParams);
+        StringBuilder paramBuilder = new();
+        for (int i = 0; i < origParams.Length; i++) {
+            if (i != 0) paramBuilder.Append(',');
+            paramBuilder.Append(remapper.RemapTypeByFullName(origParams[i]));
+        }
+        attribute.SetAttributeValue(index, returnType + " " + method + "(" + paramBuilder.ToString() + ")");
+        return;
     }
 
     #endregion
@@ -280,12 +451,12 @@ public static partial class Remapping {
     private static void AddMappingsFiles(DirectoryInfo mappingsDirectory, Dictionary<Guid, string> mappings, bool recursive = false)
         => AddMappingsFiles(mappingsDirectory.GetFiles("*", new EnumerationOptions { RecurseSubdirectories = recursive }).Select(file => file.FullName).ToList(), mappings);
 
-    private static bool TryLoadObfToIntermediaryMappings(AssemblyDefinition assembly, out Mappings mappings) {
+    private static bool TryLoadObfToIntermediaryMappings(AssemblyDefinition assembly, out Mappings mappings, bool logConsoleNormal = true) {
         mappings = new Mappings();
 
         Guid mvid = assembly.GetMvid();
         if (ObfToIntermediaryMappings.TryGetValue(mvid, out mappings)) {
-            Console.WriteLine("Found valid intermediary mappings from cache.");
+            if (logConsoleNormal) Console.WriteLine("Found valid intermediary mappings from cache.");
             return true;
         }
 
@@ -299,7 +470,7 @@ public static partial class Remapping {
             goto fail;
         }
 
-        Console.WriteLine($"Found valid intermediary mappings: {Path.GetFileName(path)}");
+        if (logConsoleNormal) Console.WriteLine($"Found valid intermediary mappings: {Path.GetFileName(path)}");
         return true;
 
     fail:
@@ -307,53 +478,66 @@ public static partial class Remapping {
         return false;
     }
 
-    private static bool TryLoadIntermediaryToNamedMappings(AssemblyDefinition assembly, out NamedMappings namedMappings) {
-        Guid mvid = assembly.GetMvid();
-        if (IntermediaryToNamedMappings.TryGetValue(mvid, out namedMappings)) {
-            Console.WriteLine("Found valid named mappings from cache.");
+    private static bool TryLoadIntermediaryToNamedMappings(out NamedMappings namedMappings, out Version mappingVersion, bool logConsoleNormal = true) {
+        if (IntermediaryToNamedMappings != null) {
+            mappingVersion = IntermediaryToNamedMappings.Item1;
+            namedMappings = IntermediaryToNamedMappings.Item2;
+            if (logConsoleNormal) Console.WriteLine("Found valid named mappings from cache.");
             return true;
         }
 
         Dictionary<string, string> mappings = [];
         Dictionary<string, Dictionary<int, string>> addedEnumVariants = [];
 
+        mappingVersion = new();
+        List<string> pathsForVersion = [];
         foreach (var pair in IntermediaryToNamedMappingsPaths) {
             string path = pair.Value;
             if (File.Exists(path)) {
                 string[] lines = File.ReadAllLines(path);
                 if (lines.Length > 1 && lines[0].StartsWith("Mapping version: ")) {
-
-                    for (int i = 1; i < lines.Length; i++) {
-                        string line = lines[i];
-
-                        if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
-                            continue;
-                        if (!line.Contains(',')) {
-                            Console.WriteLine($"Missing ',' at {line}");
-                        }
-
-                        string[] parts = line.Split(',');
-                        if (parts[0].Contains('.')) {
-                            string[] enumVariantParts = parts[0].Split('.');
-                            var enumName = enumVariantParts[0];
-                            var enumVariantValueStr = enumVariantParts[1].Trim();
-                            // why can int.Parse not just handle `0x` prefixes itself? smh
-                            int enumVariantValue = enumVariantValueStr.StartsWith("0x") ? int.Parse(enumVariantValueStr[2..], NumberStyles.HexNumber) : int.Parse(enumVariantValueStr);
-                            if (!addedEnumVariants.ContainsKey(enumName))
-                                addedEnumVariants[enumName] = [];
-                            addedEnumVariants[enumName][enumVariantValue] = parts[1];
-                        } else {
-                            mappings[parts[0]] = parts[1];
-                        }
+                    var version = Version.Parse(lines[0].Split("Mapping version: ")[1]);
+                    if (version > mappingVersion) {
+                        pathsForVersion = [];
+                        mappingVersion = version;
                     }
-
-                    Console.WriteLine($"Found valid named mappings: {Path.GetFileName(path)}");
+                    if (mappingVersion == version) {
+                        pathsForVersion.Add(path);
+                    }
                 }
             }
         }
+        foreach (var path in pathsForVersion) {
+            string[] lines = File.ReadAllLines(path);
+
+            for (int i = 1; i < lines.Length; i++) {
+                string line = lines[i];
+
+                if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
+                    continue;
+                if (!line.Contains(',')) {
+                    Console.WriteLine($"Missing ',' at {line}");
+                }
+
+                string[] parts = line.Split(',');
+                if (parts[0].Contains('.')) {
+                    string[] enumVariantParts = parts[0].Split('.');
+                    var enumName = enumVariantParts[0];
+                    var enumVariantValueStr = enumVariantParts[1].Trim();
+                    // why can int.Parse not just handle `0x` prefixes itself? smh
+                    int enumVariantValue = enumVariantValueStr.StartsWith("0x") ? int.Parse(enumVariantValueStr[2..], NumberStyles.HexNumber) : int.Parse(enumVariantValueStr);
+                    if (!addedEnumVariants.ContainsKey(enumName))
+                        addedEnumVariants[enumName] = [];
+                    addedEnumVariants[enumName][enumVariantValue] = parts[1];
+                } else {
+                    mappings[parts[0]] = parts[1];
+                }
+            }
+            if (logConsoleNormal) Console.WriteLine($"Found valid named mappings: {Path.GetFileName(path)}");
+        }
 
         namedMappings = new NamedMappings(mappings, addedEnumVariants);
-        IntermediaryToNamedMappings[mvid] = namedMappings;
+        IntermediaryToNamedMappings = new(mappingVersion, namedMappings);
 
         if (mappings.Count == 0) {
             Console.WriteLine("-<!>- Failed to find valid named mappings!");
@@ -361,6 +545,11 @@ public static partial class Remapping {
         }
 
         return true;
+    }
+
+    public static Version GetNamedMappingsVersion() {
+        TryLoadIntermediaryToNamedMappings(out var _, out var version, false);
+        return version;
     }
 
     public static void RemapToIntermediary(AssemblyDefinition obfAssemblyDef) {
@@ -397,8 +586,8 @@ public static partial class Remapping {
         }
     }
 
-    public static void RemapToNamed(AssemblyDefinition intermediaryAssemblyDef) {
-        if (!TryLoadIntermediaryToNamedMappings(intermediaryAssemblyDef, out NamedMappings namedMappings))
+    public static void RemapToNamed(AssemblyDefinition intermediaryAssemblyDef, bool logConsoleNormal = true) {
+        if (!TryLoadIntermediaryToNamedMappings(out NamedMappings namedMappings, out var _, logConsoleNormal))
             return;
 
         var allTypes = StringDumping.CollectNestedTypes(intermediaryAssemblyDef.MainModule.Types);
@@ -413,10 +602,10 @@ public static partial class Remapping {
 
     #region Backmapping
 
-    public static void RemapNamedToIntermediary(AssemblyDefinition namedAssemblyDef) {
+    public static void RemapNamedToIntermediary(AssemblyDefinition namedAssemblyDef, bool logConsoleNormal = true) {
 
-        Globals.TryLoadLightning(out var origAssembly);
-        if (!TryLoadNamedToIntermediaryMappings(origAssembly, out Backmapper backmapper))
+        Globals.TryLoadLightning(out var origAssembly, false);
+        if (!TryLoadNamedToIntermediaryMappings(origAssembly, out Backmapper backmapper, logConsoleNormal))
             return;
 
         var allTypes = StringDumping.CollectNestedTypes(namedAssemblyDef.MainModule.Types);
@@ -426,16 +615,16 @@ public static partial class Remapping {
         DoRemap(new IntermediaryRemapper(backmapper.Mappings), allTypes);
     }
 
-    private static bool TryLoadNamedToIntermediaryMappings(AssemblyDefinition originalAssembly, out Backmapper backmapper) {
+    private static bool TryLoadNamedToIntermediaryMappings(AssemblyDefinition originalAssembly, out Backmapper backmapper, bool logConsoleNormal = true) {
 
         Guid mvid = originalAssembly.GetMvid();
         if (NamedToIntermediaryMappings.TryGetValue(mvid, out backmapper)) {
-            Console.WriteLine("Found valid named mappings from cache.");
+            if (logConsoleNormal) Console.WriteLine("Found valid backmapper from cache.");
             return true;
         }
 
-        TryLoadObfToIntermediaryMappings(originalAssembly, out Mappings oToI);
-        TryLoadIntermediaryToNamedMappings(originalAssembly, out NamedMappings iToN);
+        TryLoadObfToIntermediaryMappings(originalAssembly, out Mappings oToI, logConsoleNormal);
+        TryLoadIntermediaryToNamedMappings(out NamedMappings iToN, out var _, logConsoleNormal);
         var namedRemapper = new NamedRemapper(iToN.Mappings);
 
         Dictionary<string, string> intermediaryTypeNamePairs = [];
@@ -456,7 +645,7 @@ public static partial class Remapping {
         };
         foreach (var classMapping in oToI.Classes){
             ClassMapping newClM = new() {
-                ClassFullNameA = MapNameFromObfuscatedToNamed(classMapping.ClassFullNameA, classMapping.ClassNameB, namedRemapper),
+                ClassFullNameA = MapNameFromObfuscatedToNamed(classMapping.ClassFullNameA, intermediaryTypeNamePairs, namedRemapper, null),
                 ClassNameB = classMapping.ClassNameB,
                 Methods = [],
                 Fields = [],
@@ -506,6 +695,10 @@ public static partial class Remapping {
         }
         backmapper = new Backmapper(mappings, iToN.AddedEnumVariants);
         NamedToIntermediaryMappings[mvid] = backmapper;
+
+        //DataSerializer.SetMultilineFormat(true);
+        //mappings.Serialize(Path.Combine(PathToMappings, "namedtointerm.json"));
+
         return false;
     }
 
@@ -528,7 +721,19 @@ public static partial class Remapping {
                 key = "==";
             } else if (item.Split("=").Length > 1) {
                 key = "=";
-            } else throw new Exception();
+            } else {
+                if (item.EndsWith('/')) {
+                    string origName2 = "#=" + item[..^1];
+                    storage += origName2 + "/";
+                    if (intermediaryTypeNamePairs.TryGetValue(storage[..^1], out var intermediary)) {
+                        builder.Append(MapNameFromObfuscatedToNamed(intermediary, intermediary, remapper) + "/");
+                        continue;
+                    }
+                } else if (intermediaryTypeNamePairs.TryGetValue(storage + "#=" + item, out var intermediary)) {
+                    return builder.ToString() + MapNameFromObfuscatedToNamed(intermediary, intermediary, remapper);
+                }
+                throw new Exception(item);
+            }
             string origName = "#=" + item.Split(key)[0] + key; // Split must have a count of 2.
             string name = storage + origName;
             if (item.Split(key)[1] == "/") {
@@ -538,7 +743,7 @@ public static partial class Remapping {
             }
 
             string nameOrig = name;
-            var generic = generics.SingleOrDefault(generic => generic.GenericNameA == name, null);
+            var generic = generics?.SingleOrDefault(generic => generic.GenericNameA == name, null);
             if (generic != null) {
                 name = MapNameFromObfuscatedToNamed(generic.GenericNameB, generic.GenericNameB, remapper);
             } else if (intermediaryTypeNamePairs.TryGetValue(name, out var intermediary)) {
@@ -556,24 +761,15 @@ public static partial class Remapping {
 
     #region Xml
 
-    public static XDocument MapXmlDocument(XDocument xml) {
-        Globals.TryLoadLightning(out var origAssembly);
-        TryLoadIntermediaryToNamedMappings(origAssembly, out var mappings);
+    public static XDocument MapXmlDocument(XDocument xml, bool logConsoleNormal = true) {
+        TryLoadIntermediaryToNamedMappings(out var mappings, out var _, logConsoleNormal);
         var mapped = MapXmlDocument(xml, mappings);
         return mapped;
     }
-    public static XDocument BackmapXmlDocument(XDocument xml) {
-        Globals.TryLoadLightning(out var origAssembly);
-        TryLoadNamedToIntermediaryMappings(origAssembly, out var mappings);
+    public static XDocument BackmapXmlDocument(XDocument xml, bool logConsoleNormal = true) {
+        Globals.TryLoadLightning(out var origAssembly, false);
+        TryLoadNamedToIntermediaryMappings(origAssembly, out var mappings, logConsoleNormal);
         var mapped = MapXmlDocument(xml, mappings.Mappings);
-        //var path = Path.Combine(PathToMappings, "documentation.xml");
-        //if (File.Exists(path)) {
-        //    File.Delete(path);
-        //}
-        //var file = File.CreateText(path);
-        //file.Write(mapped.ToString());
-        //file.Flush();
-        //file.Close();
         return mapped;
     }
     private static XDocument MapXmlDocument(XDocument xml, Mappings mappings) {

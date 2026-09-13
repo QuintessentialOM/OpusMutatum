@@ -31,14 +31,30 @@ public class MergeModder : MonoModder {
     }
     public override void LogVerbose(string text) { }
 
-    public virtual void ReadMod(KeyValuePair<string, string> modPair) {
+    public virtual void ReadMod(KeyValuePair<ModMeta, string> modPair) {
         var orig = Mods.Count;
         base.ReadMod(modPair.Value);
 
         if (orig < Mods.Count) {
-            ModIds.Add(modPair.Key);
+            ConvertModMappingVersion(modPair, (ModuleDefinition)Mods[^1]);
+            ModIds.Add(modPair.Key.ModId);
         }
     }
+    public virtual void ConvertModMappingVersion(KeyValuePair<ModMeta, string> modPair, ModuleDefinition module) {
+        if (modPair.Key.Mappings == Remapping.GetNamedMappingsVersion().ToString()) return;
+        modPair.Key.OldMappings = modPair.Key.Mappings;
+
+        //string modDir = modPair.Key.PathToDirectory; // TODO: Save the mapped assembly 
+        if (modPair.Key.Mappings != "Intermediary") {
+            if (modPair.Key.Mappings != "") throw new Exception("Unknown mapping '" + modPair.Key.Mappings + "' for assembly: " + modPair.Value);
+            // -TODO: Return here, the following code is only here to find bugs. It shouldn't make changes to the assembly
+            return;
+            //Remapping.RemapNamedToIntermediary(((ModuleDefinition)Mods[^1]).Assembly, false);
+        }
+        Remapping.RemapToNamed(((ModuleDefinition)Mods[^1]).Assembly, false);
+        modPair.Key.Mappings = Remapping.GetNamedMappingsVersion().ToString();
+    }
+
     public override void AutoPatch() {
         Log("[AutoPatch] Parsing rules in loaded mods");
         for (int i = 0; i < Mods.Count; i++) {

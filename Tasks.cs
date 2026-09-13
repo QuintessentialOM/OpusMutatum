@@ -2,6 +2,8 @@
 using OpusMutatum.Merging;
 using System;
 using System.IO;
+using System.IO.Compression;
+using System.Xml.Linq;
 
 namespace OpusMutatum;
 public static class Tasks {
@@ -355,7 +357,7 @@ public static class Tasks {
             }
         }
         if (name == "") {
-            Console.WriteLine("Mod name has to be specified with -name for the 'newMod' task.");
+            Console.WriteLine("Mod folder name has to be specified with -name for the 'newMod' task.");
             return;
         }
 
@@ -363,5 +365,103 @@ public static class Tasks {
         if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
         Console.WriteLine("Creating Mod: " + name);
         Directory.CreateDirectory(path);
+    }
+
+    public static void HandleExport(string[] args) {
+        string name = "";
+        string outputPath = "";
+        bool asName = false, asOutputPath = false;
+        foreach (var item in args) {
+            if (asName) {
+                asName = false;
+                name = item.Trim(['"']);
+            } else if (asOutputPath) {
+                asOutputPath = false;
+                outputPath = item.Trim(['"']);
+            } else {
+                switch (item) {
+                    case "-name":
+                        asName = true;
+                        break;
+                    case "-outputPath":
+                        asOutputPath = true;
+                        break;
+                    default:
+                        Console.WriteLine($"Invalid Argument '{item}' for 'export' task.");
+                        break;
+                }
+            }
+        }
+        if (name == "") {
+            Console.WriteLine("Mod folder name has to be specified with -name for the 'export' task.");
+            return;
+        }
+        if (outputPath == "") {
+            Console.WriteLine("Output path has to be specified with -outputPath for the 'export' task.");
+            return;
+        }
+
+        var task = System.Threading.Tasks.Task.Run(async () => {
+            bool success = false;
+            string path = Path.Combine(outputPath, name);
+            string modPath = Path.Combine(Globals.Tasks.ModsDir, name);
+            if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
+            Console.WriteLine("Exporting Mod: " + name);
+            Directory.CreateDirectory(path);
+            try {
+
+                var allDirectories = Directory.GetDirectories(modPath, "*", SearchOption.AllDirectories);
+                foreach (string dir in allDirectories) {
+                    string dirToCreate = dir.Replace(modPath, path);
+                    Directory.CreateDirectory(dirToCreate);
+                }
+                var allFiles = Directory.GetFiles(modPath, "*.*", SearchOption.AllDirectories);
+                foreach (string filePath in allFiles) {
+                    File.Copy(filePath, filePath.Replace(modPath, path), true);
+                }
+
+
+                ModMeta mod;
+                string metaPath = Path.Combine(path, ModLoader.modMetaFileName);
+                if (File.Exists(metaPath)) {
+                    using StreamReader reader = new(metaPath);
+                    mod = DataSerializer.Deserialize<ModMeta>(metaPath);
+                } else
+                    throw new Exception(ModLoader.modMetaFileName + " wasn't found in mod: " + name);
+                if (mod.DLL != "" && mod.Mappings != "Intermediary") {
+                    if (mod.Mappings != "" && mod.Mappings != Remapping.GetNamedMappingsVersion().ToString())
+                        throw new Exception("Unable to export mod with set mapping version'" + mod.Mappings + "'");
+                    // Handle dll
+                    string sourceDllPath = Path.Combine(modPath, mod.DLL);
+                    string destinationDllPath = Path.Combine(path, mod.DLL);
+                    if (File.Exists(sourceDllPath) && Path.GetExtension(sourceDllPath) == ".dll") {
+                        Globals.TryLoadAssemblyDef(sourceDllPath, out var assembly, false);
+                        Remapping.RemapNamedToIntermediary(assembly, false);
+                        //Remapping.RemapToNamed(assembly, false);
+                        assembly.Write(destinationDllPath);
+
+                        // Handle xml
+                        string xmlPath = Path.ChangeExtension(sourceDllPath, ".xml");
+                        if (File.Exists(xmlPath)) {
+                            var xml = XDocument.Load(xmlPath);
+                            xml = Remapping.BackmapXmlDocument(xml, false);
+                            xml.Save(Path.ChangeExtension(destinationDllPath, ".xml"));
+                        }
+                    }
+                    mod.Mappings = "Intermediary";
+                }
+                mod.Serialize(metaPath);
+
+                string zipPath = Path.Combine(outputPath, name + "_" + mod.Version.ToString() + ".zip");
+                if (File.Exists(zipPath)) File.Delete(zipPath);
+                ZipFile.CreateFromDirectory(path, zipPath);
+                success = true;
+            } catch (Exception e) {
+                Console.WriteLine("Failed to export Mod: " + name + "\n" + e);
+            } finally {
+                Directory.Delete(path, true);
+            }
+            if (success) Console.WriteLine("Exported Mod: " + name);
+        });
     }
 }

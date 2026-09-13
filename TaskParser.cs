@@ -184,6 +184,7 @@ public class Task {
         { "devMerge", Command.MergeDev },
         { "merge", Command.Merge },
         { "newMod", Command.NewMod },
+        { "export", Command.Export },
         { "copy", Command.Copy },
         { "run", Command.Run }
     };
@@ -195,6 +196,7 @@ public enum Command {
     MergeDev,
     Merge,
     NewMod,
+    Export,
     Copy,
-    Run
+    Run,
 }

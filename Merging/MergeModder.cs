@@ -53,7 +53,8 @@ public class MergeModder : MonoModder {
             //Remapping.RemapNamedToIntermediary(((ModuleDefinition)Mods[^1]).Assembly, false);
         }
         Remapping.RemapToNamed(((ModuleDefinition)Mods[^1]).Assembly, false);
-        modPair.Key.Mappings = Remapping.GetNamedMappingsVersion().ToString();
+        // Only set if assembly is saved, otherwise in the next merge task the assembly will not be converted even if it needs to.
+        //modPair.Key.Mappings = Remapping.GetNamedMappingsVersion().ToString();
     }
 
     public override void AutoPatch() {

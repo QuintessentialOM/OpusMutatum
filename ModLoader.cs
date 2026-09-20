@@ -115,7 +115,7 @@ static public class ModLoader {
         HashSet<string> ids = [];
         foreach (ModMeta mod in Mods) {
             if (ids.Contains(mod.ModId)) {
-                throw new Exception("Duplicate mod wiht id " + mod.ModId + " found, use the blacklist to only permit at most one.");
+                throw new Exception("Duplicate mod with id " + mod.ModId + " found, use the blacklist to only permit at most one.");
             }
             ids.Add(mod.ModId);
         }

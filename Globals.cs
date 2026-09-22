@@ -88,8 +88,8 @@ public static class Globals {
     public static bool TryLoadLightningExe(out AssemblyDefinition lightningExeAssemblyDef)
         => TryLoadAssemblyDef(PathToLightningExe, out lightningExeAssemblyDef);
 
-    public static bool TryLoadLightning(out AssemblyDefinition lightningAssemblyDef)
-        => TryLoadAssemblyDef(Path.Combine(PathToOutput, PathToLightning), out lightningAssemblyDef);
+    public static bool TryLoadLightning(out AssemblyDefinition lightningAssemblyDef, bool logConsoleNormal = true)
+        => TryLoadAssemblyDef(Path.Combine(PathToOutput, PathToLightning), out lightningAssemblyDef, logConsoleNormal);
     public static bool TryLoadIntermediaryLightning(out AssemblyDefinition intermediaryLightningAssemblyDef, bool logConsoleNormal = true)
         => TryLoadAssemblyDef(Path.Combine(PathToOutput, PathToIntermediaryLightning), out intermediaryLightningAssemblyDef, logConsoleNormal);
     public static bool TryLoadModdedLightning(out AssemblyDefinition moddedLightningAssemblyDef)

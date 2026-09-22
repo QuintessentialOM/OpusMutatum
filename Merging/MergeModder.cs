@@ -6,6 +6,7 @@ using MonoMod.Utils;
 using OpusMutatum;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace OpusMutatum.Merging;
 
@@ -31,14 +32,31 @@ public class MergeModder : MonoModder {
     }
     public override void LogVerbose(string text) { }
 
-    public virtual void ReadMod(KeyValuePair<string, string> modPair) {
+    public virtual void ReadMod(KeyValuePair<ModMeta, string> modPair) {
         var orig = Mods.Count;
         base.ReadMod(modPair.Value);
 
         if (orig < Mods.Count) {
-            ModIds.Add(modPair.Key);
+            ConvertModMappingVersion(modPair, (ModuleDefinition)Mods[^1]);
+            ModIds.Add(modPair.Key.ModId);
         }
     }
+    public virtual void ConvertModMappingVersion(KeyValuePair<ModMeta, string> modPair, ModuleDefinition module) {
+        if (modPair.Key.Mappings == Remapping.GetNamedMappingsVersion().ToString()) return;
+        modPair.Key.OldMappings = modPair.Key.Mappings;
+
+        //string modDir = modPair.Key.PathToDirectory; // TODO: Save the mapped assembly 
+        if (modPair.Key.Mappings != "Intermediary") {
+            if (modPair.Key.Mappings != "") throw new Exception("Unknown mapping '" + modPair.Key.Mappings + "' for assembly: " + modPair.Value);
+            // -TODO: Return here, the following code is only here to find bugs. It shouldn't make changes to the assembly
+            return;
+            //Remapping.RemapNamedToIntermediary(((ModuleDefinition)Mods[^1]).Assembly, false);
+        }
+        Remapping.RemapToNamed(((ModuleDefinition)Mods[^1]).Assembly, false);
+        // Only set if assembly is saved, otherwise in the next merge task the assembly will not be converted even if it needs to.
+        //modPair.Key.Mappings = Remapping.GetNamedMappingsVersion().ToString();
+    }
+
     public override void AutoPatch() {
         Log("[AutoPatch] Parsing rules in loaded mods");
         for (int i = 0; i < Mods.Count; i++) {
@@ -91,6 +109,84 @@ public class MergeModder : MonoModder {
 
         Stash.ApplyAllILInjectors();
         Stash.ApplyAllWrapOperations();
+    }
+
+    public override void PatchType(TypeDefinition type) {
+        var typeName = type.GetPatchFullName();
+
+        TypeReference targetType = Module.GetType(typeName, false);
+        if (targetType == null) return; // Type should've been added or removed accordingly.
+        TypeDefinition targetTypeDef = targetType?.SafeResolve();
+
+        if ((type.Namespace != "MonoMod" && type.HasCustomAttribute("MonoMod.MonoModIgnore")) || // Fix legacy issue: Copy / inline any used modifiers.
+            SkipList.Contains(typeName) ||
+            !MatchingConditionals(type, Module)) {
+
+            if (type.HasCustomAttribute("MonoMod.MonoModIgnore") && targetTypeDef != null) {
+                // MonoModIgnore is a special case, as registered custom attributes should still be applied.
+                foreach (CustomAttribute attrib in type.CustomAttributes)
+                    if (CustomAttributeHandlers.ContainsKey(attrib.AttributeType.FullName))
+                        targetTypeDef.CustomAttributes.Add(attrib.Clone());
+            }
+
+            PatchNested(type);
+            return;
+        }
+
+        if (typeName == type.FullName)
+            LogVerbose($"[PatchType] Patching type {typeName}");
+        else
+            LogVerbose($"[PatchType] Patching type {typeName} (prefixed: {type.FullName})");
+
+        // Add "new" custom attributes
+        foreach (CustomAttribute attrib in type.CustomAttributes)
+            if (!targetTypeDef.HasCustomAttribute(attrib.AttributeType.FullName))
+                targetTypeDef.CustomAttributes.Add(attrib.Clone());
+
+        var propMethods = new HashSet<MethodDefinition>(); // In the Patch pass, prop methods exist twice.
+        foreach (PropertyDefinition prop in type.Properties)
+            PatchProperty(targetTypeDef, prop, propMethods);
+
+        var eventMethods = new HashSet<MethodDefinition>(); // In the Patch pass, prop methods exist twice.
+        foreach (EventDefinition eventdef in type.Events)
+            PatchEvent(targetTypeDef, eventdef, eventMethods);
+
+        foreach (MethodDefinition method in type.Methods)
+            if (!propMethods.Contains(method) && !eventMethods.Contains(method))
+                PatchMethod(targetTypeDef, method);
+
+        if (type.HasCustomAttribute("MonoMod.MonoModEnumReplace")) {
+            for (var ii = 0; ii < targetTypeDef.Fields.Count;) {
+                if (targetTypeDef.Fields[ii].Name == "value__") {
+                    ii++;
+                    continue;
+                }
+
+                targetTypeDef.Fields.RemoveAt(ii);
+            }
+        }
+
+        if (type.IsSequentialLayout)
+            targetTypeDef.IsSequentialLayout = true;
+
+        if (type.IsExplicitLayout)
+            targetTypeDef.IsExplicitLayout = true;
+
+        if (type.HasLayoutInfo) {
+            targetTypeDef.PackingSize = type.PackingSize;
+            targetTypeDef.ClassSize = type.ClassSize;
+        }
+
+        foreach (var interf in type.Interfaces) {
+            if (!targetTypeDef.Interfaces.Any(i => i.InterfaceType.FullName == interf.InterfaceType.FullName)) {
+                targetTypeDef.Interfaces.Add(interf);
+            }
+        }
+
+        foreach (FieldDefinition field in type.Fields)
+            PatchField(targetTypeDef, field);
+
+        PatchNested(type);
     }
 
     public override MethodDefinition PatchMethod(TypeDefinition targetType, MethodDefinition method) {

@@ -145,6 +145,9 @@ public static class OpusMutatum {
                 case Command.NewMod:
                     Tasks.HandleNewMod(task.Args);
                     break;
+                case Command.Export:
+                    Tasks.HandleExport(task.Args);
+                    break;
                 case Command.Run:
                     Tasks.HandleRun(task.Args);
                     break;

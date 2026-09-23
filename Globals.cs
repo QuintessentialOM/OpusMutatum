@@ -106,11 +106,11 @@ public static class Globals {
                 Arguments = $"/C \"{command}\""
             },
             OS.Linux => new ProcessStartInfo {
-                FileName = "/bin/bash",
+                FileName = "bash",
                 Arguments = $"-c \"{command}\""
             },
             OS.MacOS => new ProcessStartInfo {
-                FileName = "/bin/bash",
+                FileName = "bash",
                 Arguments = $"-c \"{command}\""
             },
             _ => new ProcessStartInfo()

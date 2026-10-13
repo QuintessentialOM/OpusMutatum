@@ -37,6 +37,7 @@ public class MergeModder : MonoModder {
         base.ReadMod(modPair.Value);
 
         if (orig < Mods.Count) {
+            ((ModuleDefinition)Mods[^1]).Architecture = TargetArchitecture.I386;
             ConvertModMappingVersion(modPair, (ModuleDefinition)Mods[^1]);
             ModIds.Add(modPair.Key.ModId);
         }
@@ -411,6 +412,7 @@ public class MergeModder : MonoModder {
                 break;
             }
         }
+        Module.Architecture = TargetArchitecture.I386;
     }
 
     public virtual MethodReference GetMonoModIgnoreCtor() {

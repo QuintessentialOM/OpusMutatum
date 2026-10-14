@@ -27,6 +27,7 @@ public static class Coreifier {
 
             // convert the module + write it out
             Coreify(module);
+            module.Architecture = TargetArchitecture.I386;
             module.Write(outputAsm ?? inputAsm, new WriterParameters { WriteSymbols = readerParams.ReadSymbols });
         } finally {
             module?.Dispose();

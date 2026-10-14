@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace OpusMutatum;
 
@@ -29,6 +30,7 @@ public static class OpusMutatum {
             foreach (var task in Globals.Tasks.Tasks) {
                 RunTask(task);
             }
+            System.Threading.Tasks.Task.WaitAll(Globals.ConcurrentTasks);
             Console.WriteLine("Done.");
             if (!autoExit) Console.ReadKey(); // keep taskText line open
 
@@ -52,19 +54,22 @@ public static class OpusMutatum {
                 Console.WriteLine(e.ToString());
             Console.ReadKey();
         }
+        System.Threading.Tasks.Task.WaitAll(Globals.ConcurrentTasks);
     }
 
     private static void HandleArguments(string[] args) {
         ArgumentParsingMode current = ArgumentParsingMode.Argument;
+        bool lightningExePathModified = false;
 
         List<string> extraStringPaths = [];
         List<string> extraIntermediaryMappingPaths = [], extraNamedMappingPaths = [];
 
-        Globals.OperatingSystem = Environment.OSVersion.Platform switch {
-            PlatformID.Win32NT or PlatformID.Win32S or PlatformID.Win32Windows or PlatformID.WinCE => Globals.OS.Windows,
-            PlatformID.MacOSX => Globals.OS.MacOS,
-            _ => Globals.OS.Linux
-        };
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            Globals.OperatingSystem = Globals.OS.Windows;
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            Globals.OperatingSystem = Globals.OS.MacOS;
+        else
+            Globals.OperatingSystem = Globals.OS.Linux;
 
         foreach (string arg in args) {
             switch (current) {
@@ -93,6 +98,7 @@ public static class OpusMutatum {
                 case ArgumentParsingMode.LightningExePath:
                     Globals.PathToLightningExe = arg;
                     current = ArgumentParsingMode.Argument;
+                    lightningExePathModified = true;
                     break;
 
                 case ArgumentParsingMode.ObfToIntermediaryMappingPath:
@@ -120,6 +126,10 @@ public static class OpusMutatum {
             }
         }
 
+        if (!lightningExePathModified && Globals.OperatingSystem == Globals.OS.MacOS) {
+            Globals.PathToLightningExe = "Opus Magnum.app/Contents/Resources/Lightning.exe";
+        }
+
         StringDumping.LoadStringsPaths(extraStringPaths);
         Remapping.LoadMappingsPaths(extraIntermediaryMappingPaths, extraNamedMappingPaths);
     }
@@ -144,6 +154,9 @@ public static class OpusMutatum {
                     break;
                 case Command.NewMod:
                     Tasks.HandleNewMod(task.Args);
+                    break;
+                case Command.Export:
+                    Tasks.HandleExport(task.Args);
                     break;
                 case Command.Run:
                     Tasks.HandleRun(task.Args);

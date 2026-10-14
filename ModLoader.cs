@@ -9,14 +9,14 @@ namespace OpusMutatum;
 
 
 static public class ModLoader {
-    private const string modMetaFileName = "modMeta.jsonc";
+    internal const string modMetaFileName = "modMeta.jsonc";
     private const string validModIdChars = "abcdefghijklmnopqrstuvwxyz_0123456789";
 
     public static string PathToMods;
     public static string PathToUnpackedMods;
     private static string PathToBlacklist;
     public static List<ModMeta> Mods { private set; get; } = [];
-    public static OrderedDictionary<string, string> DllPaths { private set; get; } = [];
+    public static OrderedDictionary<ModMeta, string> DllPaths { private set; get; } = [];
     public static bool IsCompleted { private set; get; } = false;
     private static bool ModsCollected = false;
 
@@ -45,7 +45,7 @@ static public class ModLoader {
         IsCompleted = true;
         CreateDataFile();
     }
-    public static OrderedDictionary<string, string> GetDevMods(string developedModId, List<string> forceLoadIds, bool logModList = false) {
+    public static OrderedDictionary<ModMeta, string> GetDevMods(string developedModId, List<string> forceLoadIds, bool logModList = false) {
         if (IsCompleted) throw new Exception("GetDevMods() must be called before LoadMods()");
 
         Log("Starting dev mod loading...");
@@ -58,7 +58,7 @@ static public class ModLoader {
             foreach (var dependency in devMods[i].Dependencies) {
                 if (!devMods.Any(mod => mod.ModId == dependency.Key)) {
                     try {
-                        devMods.Add(Mods.Where(mod => mod.ModId == dependency.Key).Single());
+                        devMods.Add(Mods.Single(mod => mod.ModId == dependency.Key));
                     } catch (Exception e) { throw new Exception("Failed to find dependency of dev mods: " + dependency.Key, e); }
                 }
             }
@@ -115,7 +115,7 @@ static public class ModLoader {
         HashSet<string> ids = [];
         foreach (ModMeta mod in Mods) {
             if (ids.Contains(mod.ModId)) {
-                throw new Exception("Duplicate mod wiht id " + mod.ModId + " found, use the blacklist to only permit at most one.");
+                throw new Exception("Duplicate mod with id " + mod.ModId + " found, use the blacklist to only permit at most one.");
             }
             ids.Add(mod.ModId);
         }
@@ -275,15 +275,15 @@ static public class ModLoader {
             }
         }
     }
-    private static OrderedDictionary<string, string> CollectDlls(List<ModMeta> mods) {
-        OrderedDictionary<string, string> dlls = [];
+    private static OrderedDictionary<ModMeta, string> CollectDlls(List<ModMeta> mods) {
+        OrderedDictionary<ModMeta, string> dlls = [];
         foreach (var mod in mods) {
             if (mod.DLL != "") {
                 if (mod.PathToDirectory != null) {
                     string dllPath = Path.Combine(mod.PathToDirectory, mod.DLL);
                     if (File.Exists(dllPath) && Path.GetExtension(dllPath) == ".dll") {
                         mod.HasDll = true;
-                        dlls.Add(mod.ModId, dllPath);
+                        dlls.Add(mod, dllPath);
                     }
                 }
             }

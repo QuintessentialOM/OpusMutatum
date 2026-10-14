@@ -14,6 +14,10 @@ public static class ContentHandling {
 
         try {
             // try to create symlinks to the Content and PackedContent folders
+            if (Globals.OperatingSystem == Globals.OS.MacOS && !File.Exists(vanillaPathToContent))
+                Directory.CreateSymbolicLink(vanillaPathToContent, Path.Combine("Opus Magnum.app/Contents/Resources", PathToContent));
+            if (Globals.OperatingSystem == Globals.OS.MacOS && !File.Exists(vanillaPathToPackedContent))
+                Directory.CreateSymbolicLink(vanillaPathToPackedContent, Path.Combine("Opus Magnum.app/Contents/Resources", PathToPackedContent));
             if (!Directory.Exists(moddedPathToContent))
                 Directory.CreateSymbolicLink(moddedPathToContent, vanillaPathToContent);
             if (!Directory.Exists(moddedPathToPackedContent))

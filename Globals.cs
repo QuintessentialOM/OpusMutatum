@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using Mono.Cecil;
 
 namespace OpusMutatum;
@@ -28,9 +29,12 @@ public static class Globals {
     public static string PathToNamedLightning = "NamedLightning.dll";
 
     public static MutatumTasks Tasks = null;
+    public static List<System.Threading.Tasks.Task> ConcurrentTasks = [];
 
     private static readonly Dictionary<string, Assembly> CachedAssemblies = new();
     private static readonly Dictionary<string, AssemblyDefinition> CachedAssemblyDefs = new();
+
+    private static Lock Lock = new();
 
     public static bool TryLoadAssembly(string path, out Assembly assembly) {
         assembly = null;
@@ -62,34 +66,37 @@ public static class Globals {
         assemblyDef = null;
         string filename = Path.GetFileName(path);
 
-        if (CachedAssemblyDefs.TryGetValue(path, out assemblyDef)) {
-            if (logConsoleNormal) Console.WriteLine($"Loaded {filename} from cache.");
+        lock (Lock) {
+
+            if (CachedAssemblyDefs.TryGetValue(path, out assemblyDef)) {
+                if (logConsoleNormal) Console.WriteLine($"Loaded {filename} from cache.");
+                return true;
+            }
+
+            if (!File.Exists(path)) {
+                Console.WriteLine($"{filename} not found!");
+                return false;
+            }
+
+            if (logConsoleNormal) Console.WriteLine($"Reading {filename}...");
+            try {
+                CachedAssemblyDefs[path] = assemblyDef = AssemblyDefinition.ReadAssembly(path)
+                    ?? throw new Exception("Failed to read assembly definition.");
+            } catch (Exception e) {
+                Console.WriteLine($"Failed to load {filename}: {e.Message}");
+                return false;
+            }
+
+            if (logConsoleNormal) Console.WriteLine($"Found {filename}: {assemblyDef!.FullName}");
             return true;
         }
-
-        if (!File.Exists(path)) {
-            Console.WriteLine($"{filename} not found!");
-            return false;
-        }
-
-        if (logConsoleNormal) Console.WriteLine($"Reading {filename}...");
-        try {
-            CachedAssemblyDefs[path] = assemblyDef = AssemblyDefinition.ReadAssembly(path)
-                ?? throw new Exception("Failed to read assembly definition.");
-        } catch (Exception e) {
-            Console.WriteLine($"Failed to load {filename}: {e.Message}");
-            return false;
-        }
-
-        if (logConsoleNormal) Console.WriteLine($"Found {filename}: {assemblyDef!.FullName}");
-        return true;
     }
 
     public static bool TryLoadLightningExe(out AssemblyDefinition lightningExeAssemblyDef)
         => TryLoadAssemblyDef(PathToLightningExe, out lightningExeAssemblyDef);
 
-    public static bool TryLoadLightning(out AssemblyDefinition lightningAssemblyDef)
-        => TryLoadAssemblyDef(Path.Combine(PathToOutput, PathToLightning), out lightningAssemblyDef);
+    public static bool TryLoadLightning(out AssemblyDefinition lightningAssemblyDef, bool logConsoleNormal = true)
+        => TryLoadAssemblyDef(Path.Combine(PathToOutput, PathToLightning), out lightningAssemblyDef, logConsoleNormal);
     public static bool TryLoadIntermediaryLightning(out AssemblyDefinition intermediaryLightningAssemblyDef, bool logConsoleNormal = true)
         => TryLoadAssemblyDef(Path.Combine(PathToOutput, PathToIntermediaryLightning), out intermediaryLightningAssemblyDef, logConsoleNormal);
     public static bool TryLoadModdedLightning(out AssemblyDefinition moddedLightningAssemblyDef)
@@ -118,8 +125,17 @@ public static class Globals {
         startInfo.RedirectStandardOutput = true;
         startInfo.UseShellExecute = false;
 
-        if (startInfo.EnvironmentVariables.ContainsKey("Path"))
-            startInfo.EnvironmentVariables["Path"] = startInfo.EnvironmentVariables["Path"] + ";" + Directory.GetCurrentDirectory();
+        switch (Globals.OperatingSystem) {
+            case Globals.OS.Windows:
+                if (startInfo.EnvironmentVariables.ContainsKey("Path"))
+                    startInfo.EnvironmentVariables["Path"] = startInfo.EnvironmentVariables["Path"] + ";" + Directory.GetCurrentDirectory();
+                break;
+            case Globals.OS.MacOS:
+            case Globals.OS.Linux:
+                if (startInfo.EnvironmentVariables.ContainsKey("PATH"))
+                    startInfo.EnvironmentVariables["PATH"] = startInfo.EnvironmentVariables["PATH"] + ":" + Directory.GetCurrentDirectory();
+                break;
+        }
 
         Process process = new() { StartInfo = startInfo };
         debugger?.BeforeProcessStart();

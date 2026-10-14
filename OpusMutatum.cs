@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace OpusMutatum;
 
@@ -62,11 +63,12 @@ public static class OpusMutatum {
         List<string> extraStringPaths = [];
         List<string> extraIntermediaryMappingPaths = [], extraNamedMappingPaths = [];
 
-        Globals.OperatingSystem = Environment.OSVersion.Platform switch {
-            PlatformID.Win32NT or PlatformID.Win32S or PlatformID.Win32Windows or PlatformID.WinCE => Globals.OS.Windows,
-            PlatformID.MacOSX => Globals.OS.MacOS,
-            _ => Globals.OS.Linux
-        };
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            Globals.OperatingSystem = Globals.OS.Windows;
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            Globals.OperatingSystem = Globals.OS.MacOS;
+        else
+            Globals.OperatingSystem = Globals.OS.Linux;
 
         foreach (string arg in args) {
             switch (current) {

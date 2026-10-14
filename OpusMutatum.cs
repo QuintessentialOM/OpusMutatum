@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace OpusMutatum;
 
@@ -58,15 +59,17 @@ public static class OpusMutatum {
 
     private static void HandleArguments(string[] args) {
         ArgumentParsingMode current = ArgumentParsingMode.Argument;
+        bool lightningExePathModified = false;
 
         List<string> extraStringPaths = [];
         List<string> extraIntermediaryMappingPaths = [], extraNamedMappingPaths = [];
 
-        Globals.OperatingSystem = Environment.OSVersion.Platform switch {
-            PlatformID.Win32NT or PlatformID.Win32S or PlatformID.Win32Windows or PlatformID.WinCE => Globals.OS.Windows,
-            PlatformID.MacOSX => Globals.OS.MacOS,
-            _ => Globals.OS.Linux
-        };
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            Globals.OperatingSystem = Globals.OS.Windows;
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            Globals.OperatingSystem = Globals.OS.MacOS;
+        else
+            Globals.OperatingSystem = Globals.OS.Linux;
 
         foreach (string arg in args) {
             switch (current) {
@@ -95,6 +98,7 @@ public static class OpusMutatum {
                 case ArgumentParsingMode.LightningExePath:
                     Globals.PathToLightningExe = arg;
                     current = ArgumentParsingMode.Argument;
+                    lightningExePathModified = true;
                     break;
 
                 case ArgumentParsingMode.ObfToIntermediaryMappingPath:
@@ -120,6 +124,10 @@ public static class OpusMutatum {
                     Console.WriteLine($"Invalid argument \"{arg}\"!");
                     break;
             }
+        }
+
+        if (!lightningExePathModified && Globals.OperatingSystem == Globals.OS.MacOS) {
+            Globals.PathToLightningExe = "Opus Magnum.app/Contents/Resources/Lightning.exe";
         }
 
         StringDumping.LoadStringsPaths(extraStringPaths);

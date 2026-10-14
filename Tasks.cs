@@ -32,11 +32,12 @@ public static class Tasks {
             return;
 
         Console.WriteLine("Dumping strings...");
+        StringDumping.EnsureDependenciesPresent(stringDumpingDir);
+
         Console.WriteLine("Creating string dumper...");
         StringDumping.CreateStringDumper(lightningExe, stringDumperPath);
 
         Console.WriteLine("Running string dumper...");
-        StringDumping.EnsureDependenciesPresent(stringDumpingDir);
         StringDumping.RunStringDumperAndAddPath(stringDumperPath);
 
         Console.WriteLine();

@@ -100,8 +100,7 @@ public static partial class DependencyHandling {
 
             case Globals.OS.MacOS:
                 // setup macos native libs
-                // TODO: i don't know how macos works
-                sourceLibPaths = ["osx"];
+                sourceLibPaths = ["osx", "Opus Magnum.app/Contents/Resources/osx"];
                 libDestinationDir = Path.Combine(Globals.PathToOutput, MacOSNativeLibPath);
                 ParseMonoNativeLibConfig(lightningNativeLibConfig, Globals.OS.MacOS, dllMap, "lib{0}.dylib");
                 break;
@@ -123,8 +122,20 @@ public static partial class DependencyHandling {
                 CopyNativeLib(libSrc, libDst);
             } else if (Directory.Exists(libSrc)) {
                 Console.WriteLine($"Copying native libraries from {libSrc} to {libDestinationDir}...");
-                foreach (string fileSrc in Directory.GetFiles(libSrc))
-                    CopyNativeLib(fileSrc, Path.Combine(libDestinationDir, Path.GetRelativePath(libSrc, fileSrc)));
+                foreach (string fileSrc in Directory.GetFiles(libSrc)) {
+                    string destination = Globals.OperatingSystem switch {
+                        Globals.OS.Windows or Globals.OS.Linux => Path.GetRelativePath(libSrc, fileSrc),
+                        Globals.OS.MacOS => Path.GetRelativePath(libSrc, fileSrc) switch {
+                            "libSDL2-2.0.0.dylib" => "SDL2.dll.dylib",
+                            "libSDL2_image-2.0.0.dylib" => "SDL2_image.dll.dylib",
+                            "libsteam_api.dylib" => "steam_api.dylib",
+                            "libvorbisfile.3.dylib" => "libvorbisfile.dll.dylib",
+                            string dest => dest,
+                        },
+                        _ => throw new ArgumentOutOfRangeException()
+                    };
+                    CopyNativeLib(fileSrc, Path.Combine(libDestinationDir, destination));
+                }
             }
         }
 

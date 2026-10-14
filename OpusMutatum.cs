@@ -59,6 +59,7 @@ public static class OpusMutatum {
 
     private static void HandleArguments(string[] args) {
         ArgumentParsingMode current = ArgumentParsingMode.Argument;
+        bool lightningExePathModified = false;
 
         List<string> extraStringPaths = [];
         List<string> extraIntermediaryMappingPaths = [], extraNamedMappingPaths = [];
@@ -97,6 +98,7 @@ public static class OpusMutatum {
                 case ArgumentParsingMode.LightningExePath:
                     Globals.PathToLightningExe = arg;
                     current = ArgumentParsingMode.Argument;
+                    lightningExePathModified = true;
                     break;
 
                 case ArgumentParsingMode.ObfToIntermediaryMappingPath:
@@ -122,6 +124,10 @@ public static class OpusMutatum {
                     Console.WriteLine($"Invalid argument \"{arg}\"!");
                     break;
             }
+        }
+
+        if (!lightningExePathModified && Globals.OperatingSystem == Globals.OS.MacOS) {
+            Globals.PathToLightningExe = "Opus Magnum.app/Contents/Resources/Lightning.exe";
         }
 
         StringDumping.LoadStringsPaths(extraStringPaths);

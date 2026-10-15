@@ -1,9 +1,11 @@
 ﻿using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Mono.Cecil.Rocks;
+using MonoMod.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace OpusMutatum {
     // Copied from https://github.com/gtw123/ShenzhenMod/blob/74b03be6a991b27a9020d393d12412712a9b1ed3/ShenzhenMod/CecilExtensions.cs
@@ -18,19 +20,24 @@ namespace OpusMutatum {
         }
 
         public static MethodDefinition FindMethod(this ModuleDefinition module, string typeName, string methodName) {
-            return module.FindType(typeName).FindMethod(methodName);
+            return module.FindType(typeName).FindMethodByName(methodName);
         }
 
         public static MethodDefinition FindMethodGlobally(this ModuleDefinition module, string methodName) {
-            return module.Types.First(a => a.Methods.Any(m => m.Name == methodName)).FindMethod(methodName);
+            return module.Types.First(a => a.Methods.Any(m => m.Name == methodName)).FindMethodByName(methodName);
         }
 
-        public static MethodDefinition FindMethod(this TypeDefinition type, string methodName) {
+        public static MethodDefinition FindMethodByName(this TypeDefinition type, string methodName) {
             var method = type.Methods.Where(m => m.Name == methodName);
             if(method.Count() == 0) {
                 throw new Exception($"Cannot find method \"{methodName}\" in type \"{type.Name}\"");
             } else if(method.Count() > 1) {
-                throw new Exception($"Found more than one method called \"{methodName}\" in type \"{type.Name}\"");
+                StringBuilder message = new($"Found more than one method called \"{methodName}\" in type \"{type.Name}\", with ids:");
+                foreach (var m in method) {
+                    message.Append("\n   " +  m.GetID());
+                }
+                message.Append("\n   --- End of method id listing ---");
+                throw new Exception(message.ToString());
             }
 
             return method.First();

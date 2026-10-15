@@ -1,13 +1,28 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net40</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationIcon>output.ico</ApplicationIcon>
+    <PackageIcon>quint_icon_slant.png</PackageIcon>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Mono.Cecil" Version="0.11.4" />
-    <PackageReference Include="System.ValueTuple" Version="4.5.0" />
+    <Content Include="output.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Mono.Cecil" Version="0.11.6" />
+	<PackageReference Include="MonoMod.Patcher" Version="25.0.1" />
+	<PackageReference Include="MonoMod.Utils" Version="25.0.14" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="quint_icon_slant.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
   </ItemGroup>
 
 </Project>

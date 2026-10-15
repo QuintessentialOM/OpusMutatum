@@ -4,12 +4,25 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationIcon>output.ico</ApplicationIcon>
+    <PackageIcon>quint_icon_slant.png</PackageIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="output.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Mono.Cecil" Version="0.11.6" />
 	<PackageReference Include="MonoMod.Patcher" Version="25.0.1" />
 	<PackageReference Include="MonoMod.Utils" Version="25.0.14" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="quint_icon_slant.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
   </ItemGroup>
 
 </Project>

@@ -53,6 +53,7 @@ public static class OpusMutatum {
             } else
                 Console.WriteLine(e.ToString());
             if (autoExit != AutoExitMode.Always) Console.ReadKey();
+            Environment.ExitCode = 1;
         }
         System.Threading.Tasks.Task.WaitAll(Globals.ConcurrentTasks);
     }

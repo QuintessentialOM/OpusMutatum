@@ -71,7 +71,11 @@ public static class TaskParser {
                 tasks.DevModIds.Add(line);
                 break;
             case ReadingMode.AutoExit:
-                tasks.AutoExit = line == "true";
+                tasks.AutoExit = line switch {
+                    "always" => AutoExitMode.Always,
+                    "true" => AutoExitMode.OnSuccess,
+                    _ => AutoExitMode.Never
+                };
                 break;
             case ReadingMode.CopyTasksPath:
                 tasksCloneTargetPath = line;
@@ -135,6 +139,12 @@ public static class TaskParser {
     }
 }
 
+public enum AutoExitMode {
+    Always,
+    OnSuccess,
+    Never
+};
+
 public class MutatumTasks {
     public List<Task> Tasks = [];
 
@@ -142,7 +152,7 @@ public class MutatumTasks {
     public string ModsDir = "./modded/Mods";
     public string MappingsDir = "./modded/Mappings";
 
-    public bool AutoExit = false;
+    public AutoExitMode AutoExit = AutoExitMode.Never;
 
     public List<string> DevModIds = [];
 }

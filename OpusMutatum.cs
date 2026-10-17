@@ -9,7 +9,7 @@ namespace OpusMutatum;
 public static class OpusMutatum {
     #region Program
 
-    private static bool autoExit = false;
+    private static AutoExitMode autoExit = AutoExitMode.Never;
 
     private enum ArgumentParsingMode {
         Argument,
@@ -32,7 +32,7 @@ public static class OpusMutatum {
             }
             System.Threading.Tasks.Task.WaitAll(Globals.ConcurrentTasks);
             Console.WriteLine("Done.");
-            if (!autoExit) Console.ReadKey(); // keep taskText line open
+            if (autoExit == AutoExitMode.Never) Console.ReadKey(); // keep taskText line open
 
             HandleCleanup();
 
@@ -52,7 +52,7 @@ public static class OpusMutatum {
                     Console.WriteLine(messages);
             } else
                 Console.WriteLine(e.ToString());
-            Console.ReadKey();
+            if (autoExit != AutoExitMode.Always) Console.ReadKey();
         }
         System.Threading.Tasks.Task.WaitAll(Globals.ConcurrentTasks);
     }
@@ -92,7 +92,7 @@ public static class OpusMutatum {
                     else if (arg.Equals("--win"))
                         Globals.OperatingSystem = Globals.OS.Windows;
                     else if (arg.Equals("--autoExit"))
-                        autoExit = true;
+                        autoExit = AutoExitMode.OnSuccess;
                     break;
 
                 case ArgumentParsingMode.LightningExePath:
@@ -180,7 +180,7 @@ public static class OpusMutatum {
         ModLoader.PathToUnpackedMods = Path.Combine(Globals.Tasks.GameDir, "UnpackedMods");
         Remapping.PathToMappings = Globals.Tasks.MappingsDir;
 
-        autoExit = Globals.Tasks.AutoExit || autoExit;
+        autoExit = autoExit == AutoExitMode.Never ? Globals.Tasks.AutoExit : autoExit;
 
         Directory.CreateDirectory(Globals.PathToOutput);
         Directory.CreateDirectory(Globals.PathToTemporaryOutput);

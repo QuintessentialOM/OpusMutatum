@@ -462,6 +462,8 @@ public static class Tasks {
                     }
                     mod.Mappings = "Intermediary";
                 }
+                if (File.Exists(metaPath))
+                    File.Delete(metaPath);
                 mod.Serialize(metaPath);
 
                 string zipPath = Path.Combine(outputPath, name + "_" + mod.Version.ToString() + ".zip");

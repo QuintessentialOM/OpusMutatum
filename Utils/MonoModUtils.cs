@@ -1,14 +1,15 @@
 ﻿using Mono.Cecil;
 using Mono.Cecil.Cil;
 using MonoMod.Cil;
+using MonoMod.Utils;
 using System;
 using System.Text;
 
-namespace MonoMod.Utils;
+namespace OpusMutatum;
 
 #pragma warning disable CS8632
 
-public static partial class Extensions {
+public static class OperationWrapperExtensions {
 
     /// <summary>
     /// Get a reference ID that is similar to the full name, but consistent between System.Reflection and Mono.Cecil.

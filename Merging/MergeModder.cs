@@ -512,8 +512,7 @@ public class MergeModder : MonoModder {
             if (found == null) {
                 if (RelinkMap.ContainsKey(type.FullName))
                     return null; // Let the post-relinker handle this.
-                throw new Exception("With Name: " + type.GetPatchFullName() + "\nA: " + typeRelinkName,
-                    new RelinkTargetNotFoundException(mtp, context));
+                throw new RelinkTargetNotFoundException(mtp, context);
             }
             return Module.ImportReference(found);
         }

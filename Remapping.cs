@@ -90,6 +90,9 @@ public static partial class Remapping {
     }
 
     private class IntermediaryRemapper(Mappings mappings) : IRemapper {
+        private readonly Dictionary<string, ClassMapping> classMappingsByFullNameA = mappings.Classes.ToDictionary(mapping => mapping.ClassFullNameA, mapping => mapping);
+        private readonly Dictionary<(MethodReference, string), MethodMapping> findMethodMemoization = [];
+
         public string RemapField(FieldReference field)
             => FindType(field.DeclaringType)?.Fields.Where(f => f.FieldNameA == field.Name).SingleOrNull()?.FieldNameB ?? field.Name;
 
@@ -189,14 +192,18 @@ public static partial class Remapping {
 
         private ClassMapping FindType(TypeReference type) {
             type = GetMainType(type); // Ignore generics, array types, reference types, etc
-            return mappings.Classes.Where(cls => cls.ClassFullNameA == type.GetPatchFullName()).SingleOrNull();
+            return classMappingsByFullNameA.GetValueOrDefault(type.GetPatchFullName(), null);
         }
 
         private MethodMapping FindMethod(MethodReference method, string nameOverride = null) {
             nameOverride ??= method.Name;
+
+            if (findMethodMemoization.TryGetValue((method, nameOverride), out MethodMapping result)) {
+                return result;
+            }
             // TODO: generic params stripped when matching method signatures due to Cecil handling generic instance method references strangely
             // probably not ideal, but maybe it's fine?
-            return FindType(method.DeclaringType)?.Methods.Where(m => {
+            result = FindType(method.DeclaringType)?.Methods.Where(m => {
                 if (m.MethodNameA != nameOverride || m.ArgumentTypeFullNamesA.Count != method.Parameters.Count || m.GenericParameters.Count != method.GenericParameters.Count)
                     return false;
                 var paramTypes = method.Parameters.Select(p => p.ParameterType.FullName).ToList();
@@ -212,6 +219,8 @@ public static partial class Remapping {
                     && m.ArgumentTypeFullNamesA.Zip(paramTypes, (a, b) => (a, b))
                         .All(pair => pair.a == pair.b);
             }).SingleOrNull();
+            findMethodMemoization.Add((method, nameOverride), result);
+            return result;
         }
     }
 

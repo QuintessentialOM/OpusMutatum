@@ -7,6 +7,7 @@ using OpusMutatum;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Versioning;
 
 namespace OpusMutatum.Merging;
 
@@ -104,6 +105,66 @@ public class MergeModder : MonoModder {
         base.ParseRules(mod);
     }
 
+    public override void PrePatchType(TypeDefinition type, bool forceAdd = false) {
+        var typeName = type.GetPatchFullName();
+
+        typeName = typeName.Replace("<>c", $"<{CurrentModID}>c");
+
+        // Fix legacy issue: Copy / inline any used modifiers.
+        if ((type.Namespace != "MonoMod" && type.HasCustomAttribute("MonoMod.MonoModIgnore")) || SkipList.Contains(typeName) || !MatchingConditionals(type, Module))
+            return;
+        // ... Except MonoModRules
+        if (type.FullName == "MonoMod.MonoModRules" && !forceAdd)
+            return;
+
+        // Check if type exists in target module or dependencies.
+        TypeReference targetType = forceAdd ? null : Module.GetType(typeName, false); // For PrePatch, we need to check in the target assembly only
+        TypeDefinition targetTypeDef = targetType?.SafeResolve();
+        if (type.HasCustomAttribute("MonoMod.MonoModReplace") || type.HasCustomAttribute("MonoMod.MonoModRemove")) {
+            if (targetTypeDef != null) {
+                if (targetTypeDef.DeclaringType == null)
+                    Module.Types.Remove(targetTypeDef);
+                else
+                    targetTypeDef.DeclaringType.NestedTypes.Remove(targetTypeDef);
+            }
+            if (type.HasCustomAttribute("MonoMod.MonoModRemove"))
+                return;
+        } else if (targetType != null) {
+            PrePatchNested(type);
+            return;
+        }
+
+        // Add the type.
+        LogVerbose($"[PrePatchType] Adding {typeName} to the target module.");
+
+        string typeFixedName = type.Name.Replace("<>c", $"<{CurrentModID}>c");
+
+        var newType = new TypeDefinition(type.Namespace, typeFixedName, type.Attributes, type.BaseType);
+
+        foreach (GenericParameter genParam in type.GenericParameters)
+            newType.GenericParameters.Add(genParam.Clone());
+
+        foreach (InterfaceImplementation interf in type.Interfaces)
+            newType.Interfaces.Add(interf);
+
+        newType.ClassSize = type.ClassSize;
+        if (type.DeclaringType != null) {
+            // The declaring type is existing as this is being called nestedly.
+            newType.DeclaringType = type.DeclaringType.Relink(Relinker, newType).Resolve();
+            newType.DeclaringType.NestedTypes.Add(newType);
+        } else {
+            Module.Types.Add(newType);
+        }
+        newType.PackingSize = type.PackingSize;
+        newType.SecurityDeclarations.AddRange(type.SecurityDeclarations);
+
+        // When adding MonoModAdded, try to reuse the just added MonoModAdded.
+        newType.CustomAttributes.Add(new CustomAttribute(GetMonoModAddedCtor()));
+
+        targetType = newType;
+
+        PrePatchNested(type);
+    }
 
     public override void PatchModule(ModuleDefinition mod) {
         base.PatchModule(mod);
@@ -114,6 +175,8 @@ public class MergeModder : MonoModder {
 
     public override void PatchType(TypeDefinition type) {
         var typeName = type.GetPatchFullName();
+
+        typeName = typeName.Replace("<>c", $"<{CurrentModID}>c");
 
         TypeReference targetType = Module.GetType(typeName, false);
         if (targetType == null) return; // Type should've been added or removed accordingly.
@@ -413,6 +476,53 @@ public class MergeModder : MonoModder {
             }
         }
         Module.Architecture = TargetArchitecture.I386;
+    }
+
+    public override IMetadataTokenProvider MainRelinker(IMetadataTokenProvider mtp, IGenericParameterProvider context) {
+        if (mtp is TypeReference type) {
+            // Type is coming from the input module - return the original.
+            if (type.Module == Module)
+                return type;
+
+            // Type isn't coming from a mod module - import the original.
+            if (type.Module != null && !Mods.Contains(type.Module))
+                return Module.ImportReference(type);
+
+            // Don't resolve references to system libraries
+            // Doing so will bypass system reference assemblies like System.Runtime and cause a lot of jank in general 
+            if (type.Scope.Name.StartsWith("System."))
+                return Module.ImportReference(type);
+
+            // Type **reference** is coming from a mod module - resolve it just to be safe.
+            type = type.SafeResolve() ?? type;
+            string typeRelinkName = type.GetPatchFullName();
+            if (typeRelinkName.Contains("<>c")) {
+                int foundIndex = 0;
+                foreach (var mod in Mods) {
+                    if (type.Module == ((ModuleDefinition)mod)) break;
+                    foundIndex++;
+                }
+                if (foundIndex < Mods.Count) {
+                    typeRelinkName = typeRelinkName.Replace("<>c", $"<{ModIds[foundIndex]}>c");
+                }
+            }
+            TypeReference found = FindTypeDeep(typeRelinkName);
+
+
+            if (found == null) {
+                if (RelinkMap.ContainsKey(type.FullName))
+                    return null; // Let the post-relinker handle this.
+                throw new RelinkTargetNotFoundException(mtp, context);
+            }
+            return Module.ImportReference(found);
+        }
+
+        if (mtp is FieldReference || mtp is MethodReference || mtp is PropertyReference || mtp is EventReference || mtp is CallSite)
+            // Don't relink those. It'd be useful to f.e. link to member B instead of member A.
+            // MonoModExt already handles the default "deep" relinking.
+            return Module.ImportReference(mtp);
+
+        throw new InvalidOperationException($"MonoMod default relinker can't handle metadata token providers of the type {mtp.GetType()}");
     }
 
     public virtual MethodReference GetMonoModIgnoreCtor() {

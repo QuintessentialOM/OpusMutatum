@@ -13,7 +13,7 @@ using static System.Reflection.BindingFlags;
 namespace OpusMutatum.Merging;
 public class CodeExecutionManager {
     private readonly MergeModder MergeModder;
-    readonly Dictionary<string, Dictionary<string, Dictionary<string, System.Reflection.MethodInfo>>> CompiledMethods = [];
+    private readonly Dictionary<string, Dictionary<string, Dictionary<string, System.Reflection.MethodInfo>>> CompiledMethods = [];
     TypeDefinition RuntimeCompiledTypeDef;
 
     public CodeExecutionManager(MergeModder mergeModder) {
@@ -28,7 +28,7 @@ public class CodeExecutionManager {
 
     public void ReadMethod(TypeDefinition type, MethodDefinition method, string modClassName) {
         if (!method.IsStatic) throw new Exception("Only static methods can be executed by Mutatum.");
-        var nested = RuntimeCompiledTypeDef.GetCompilerGeneratedType(modClassName, false).GetCompilerGeneratedType("<"+ type.Name + ">", false);
+        var nested = RuntimeCompiledTypeDef.GetCompilerGeneratedType(modClassName, false).GetCompilerGeneratedType("<" + type.Name + ">", false);
 
         var copy = new MethodDefinition(method.Name, method.Attributes, method.ReturnType) {
             Body = method.Body,
@@ -43,9 +43,9 @@ public class CodeExecutionManager {
         CopyCompileGeneratedType(origGeneratedType, generatedType, method.Name);
         CopyDisplayClasses(nested, method);
 
-
         nested.Methods.Add(copy);
     }
+    
     private void CopyCompileGeneratedType(TypeDefinition origGeneratedType, TypeDefinition generatedType, string methodName) {
         if (origGeneratedType == null) return;
 
@@ -75,7 +75,6 @@ public class CodeExecutionManager {
         }
 
         foreach (var methodDef in generatedMethods) {
-
             var copyGen = new MethodDefinition(methodDef.Name, methodDef.Attributes, methodDef.ReturnType) {
                 Body = methodDef.Body,
                 DeclaringType = generatedType
@@ -87,7 +86,6 @@ public class CodeExecutionManager {
             methodDef.CustomAttributes.Add(new CustomAttribute(MergeModder.GetMonoModIgnoreCtor()));
 
             string fieldName = "<>9" + methodDef.Name[(2 + methodName.Length + 1)..];
-
             var fieldDef = origGeneratedType.Fields.Single(field => field.Name == fieldName);
             var copyGenF = new FieldDefinition(fieldDef.Name, fieldDef.Attributes, fieldDef.FieldType) {
                 IsStatic = fieldDef.IsStatic
@@ -97,6 +95,7 @@ public class CodeExecutionManager {
             fieldDef.CustomAttributes.Add(new CustomAttribute(MergeModder.GetMonoModNoNewCtor()));
         }
     }
+    
     private void CopyDisplayClasses(TypeDefinition declaringType, MethodDefinition method) {
         foreach (var nestedType in method.DeclaringType.NestedTypes) {
             if (nestedType.Name.StartsWith("<>c__DisplayClass")) {
@@ -159,8 +158,8 @@ public class CodeExecutionManager {
             }
         }
     }
+    
     private static Type ExecuteRules(MergeModder self, TypeDefinition orig) {
-
         var wrapper = ModuleDefinition.CreateModule(
             $"{self.Module.Name[..^4]}.MonoModRules [MMILRT, ID:{MonoModRulesManager.GetId(self)}]",
             new ModuleParameters() {
@@ -239,19 +238,26 @@ public class CodeExecutionManager {
                     if (origType == Orig)
                         return Module.GetType(typeRef.FullName);
 
-            if (mtp is TypeDefinition typeDef && mtp.ToString().StartsWith("patch_") && mtp.ToString().EndsWith("<>c") && context is MethodDefinition methodDef) {
-                return methodDef.DeclaringType.NestedTypes.Where(type => type.Name == "<>c").Single();
-            }
-            if (mtp is TypeDefinition typeDef2 && mtp.ToString().StartsWith("patch_") && mtp.ToString().EndsWith("<>c") && context is TypeDefinition typeDef3 && context.ToString().EndsWith("<>c")) {
-                return typeDef3;
-            }
-
-            if (mtp is TypeDefinition displayClass && displayClass.Name.StartsWith("<>c__DisplayClass") && context is MethodDefinition methodDef2) {
-                return methodDef2.DeclaringType.NestedTypes.Single(type => type.Name == displayClass.Name);
-            }
+            // relink compiler generated types
+            if (mtp is TypeDefinition && mtp.ToString() is { } mtpString && mtpString.StartsWith("patch_") && mtpString.EndsWith("<>c") && LastNonCompilerGeneratedParent(context) is { } parent1)
+                return parent1.NestedTypes.Single(type => type.Name == "<>c");
+            if (mtp is TypeDefinition displayClass && displayClass.Name.StartsWith("<>c__DisplayClass") && LastNonCompilerGeneratedParent(context) is { } parent2)
+                return parent2.NestedTypes.Single(type => type.Name == displayClass.Name);
 
             return base.Relinker(mtp, context);
         }
 
+        private static TypeDefinition LastNonCompilerGeneratedParent(IGenericParameterProvider context) {
+            TypeDefinition parent = context switch {
+                TypeDefinition typeDef => typeDef,
+                MethodDefinition methodDef => methodDef.DeclaringType,
+                _ => null // idk
+            };
+            
+            // yeah sure
+            while (parent?.Name.Contains("<>c") ?? false)
+                parent = parent.DeclaringType;
+            return parent;
+        }
     }
 }

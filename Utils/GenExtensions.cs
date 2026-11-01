@@ -1,7 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Text.RegularExpressions;
 
 namespace OpusMutatum {
 
@@ -15,5 +14,8 @@ namespace OpusMutatum {
 		public static TSource SingleOrNull<TSource>(this IEnumerable<TSource> source) where TSource : class {
 			return source.Count() == 0 ? null : source.Single();
 		}
+
+		public static bool MatchesWithWildcards(this string s, string pattern)
+			=> new Regex("^" + Regex.Escape(pattern).Replace(@"\*", ".*") + "$", RegexOptions.Singleline).IsMatch(s);
 	}
 }

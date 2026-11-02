@@ -516,7 +516,8 @@ public static class Tasks {
                     File.Delete(metaPath);
                 mod.Serialize(metaPath);
 
-                string zipPath = Path.Combine(outputPath, string.Format(outputName ?? name + "_{0}", mod.Version) + ".zip");
+                string zipName = (outputName ?? name + "_{version}.zip").Replace("{version}", mod.Version.ToString());
+                string zipPath = Path.Combine(outputPath, zipName);
                 if (File.Exists(zipPath)) File.Delete(zipPath);
                 ZipFile.CreateFromDirectory(path, zipPath);
                 Console.WriteLine("[Exporter] Finished mod: " + name);

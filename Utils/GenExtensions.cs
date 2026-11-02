@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 
@@ -15,5 +16,8 @@ namespace OpusMutatum {
 		public static TSource SingleOrNull<TSource>(this IEnumerable<TSource> source) where TSource : class {
 			return source.Count() == 0 ? null : source.Single();
 		}
+
+		public static string EscapePath(this string path)
+			=> Path.GetFullPath(path).Replace(" ", "\\ "); // todo: does anything else need escaping?
 	}
 }

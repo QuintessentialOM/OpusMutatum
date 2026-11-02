@@ -6,13 +6,13 @@ namespace OpusMutatum;
 
 public static class TaskParser {
 
-    static readonly string tasksFileName = "tasks.txt";
+    public static string TasksPath = "tasks.txt";
     static readonly string exampleFileData = "Tasks:\r\n* strings --onlyOnChange\r\n* intermediary --onlyOnChange\r\n* merge --onlyOnChange --asNamed\r\n* run --readLogs\r\n\r\nAutoExit:\r\n  true";
 
     private static string tasksCloneTargetPath = "";
     public static MutatumTasks ReadTasksFromFile() {
 
-        string tasksFilePath = Path.Combine(Directory.GetCurrentDirectory(), tasksFileName);
+        string tasksFilePath = Path.Combine(Directory.GetCurrentDirectory(), TasksPath);
         if (!File.Exists(tasksFilePath)) {
             Console.WriteLine("Didn't find config file at: " + tasksFilePath);
             Console.WriteLine("Generating default file.");
@@ -25,7 +25,8 @@ public static class TaskParser {
     }
 
     private static MutatumTasks FromFile(string filePath) {
-        MutatumTasks toReturn = new();
+        string tasksFolder = Path.GetDirectoryName(filePath);
+        MutatumTasks toReturn = new(tasksFolder);
 
         using (StreamReader st = new(filePath)) {
             string line;
@@ -52,9 +53,13 @@ public static class TaskParser {
                         readingMode = ReadingMode.AutoExit;
                     } else if (line == "CopyTasksPath:") {
                         readingMode = ReadingMode.CopyTasksPath;
+                    } else if (line == "VanillaGameDir:") {
+                        readingMode = ReadingMode.VanillaGameDir;
+                    } else if (line == "ModdedGameDir:") {
+                        readingMode = ReadingMode.ModdedGameDir;
                     }
                 } else {
-                    ReadData(toReturn, readingMode, line.Trim());
+                    ReadData(toReturn, readingMode, line.Trim(), tasksFolder);
                     if (!isList) readingMode = ReadingMode.None;
                 }
             }
@@ -62,7 +67,7 @@ public static class TaskParser {
         return toReturn;
     }
 
-    private static void ReadData(MutatumTasks tasks, ReadingMode mode, string line) {
+    private static void ReadData(MutatumTasks tasks, ReadingMode mode, string line, string tasksFolder) {
         switch (mode) {
             case ReadingMode.Tasks:
                 tasks.Tasks.Add(new Task(line));
@@ -78,7 +83,18 @@ public static class TaskParser {
                 };
                 break;
             case ReadingMode.CopyTasksPath:
-                tasksCloneTargetPath = line;
+                tasksCloneTargetPath = Path.Combine(tasksFolder, line);
+                break;
+            case ReadingMode.VanillaGameDir:
+                tasks.VanillaGameDir = Path.Combine(tasksFolder, line);
+                tasks.ModdedGameDir = Path.Combine(tasksFolder, line, "modded");
+                tasks.ModsDir = Path.Combine(tasksFolder, line, "modded", "Mods");
+                tasks.MappingsDir = Path.Combine(tasksFolder, line, "modded", "Mappings");
+                break;
+            case ReadingMode.ModdedGameDir:
+                tasks.ModdedGameDir = Path.Combine(tasksFolder, line);
+                tasks.ModsDir = Path.Combine(tasksFolder, line, "Mods");
+                tasks.MappingsDir = Path.Combine(tasksFolder, line, "Mappings");
                 break;
             default:
                 break;
@@ -87,13 +103,13 @@ public static class TaskParser {
 
     private static void CloneTasksTxt(string path) {
         if (Directory.Exists(path)) {
-            path = Path.Combine(path, tasksFileName);
+            path = Path.Combine(path, "tasks.txt");
         } else {
             path = Path.ChangeExtension(path, ".txt");
         }
         if (File.Exists(path))
             File.Delete(path);
-        string tasksFilePath = Path.Combine(Directory.GetCurrentDirectory(), tasksFileName);
+        string tasksFilePath = Path.Combine(Directory.GetCurrentDirectory(), TasksPath);
         using var file = File.CreateText(path);
         using (StreamReader st = new(tasksFilePath)) {
             bool commentOut = false;
@@ -135,7 +151,9 @@ public static class TaskParser {
         Tasks,
         DevMods,
         AutoExit,
-        CopyTasksPath
+        CopyTasksPath,
+        VanillaGameDir,
+        ModdedGameDir
     }
 }
 
@@ -145,12 +163,13 @@ public enum AutoExitMode {
     Never
 };
 
-public class MutatumTasks {
+public class MutatumTasks(string tasksFolder) {
     public List<Task> Tasks = [];
 
-    public string GameDir = "./modded";
-    public string ModsDir = "./modded/Mods";
-    public string MappingsDir = "./modded/Mappings";
+    public string VanillaGameDir = tasksFolder;
+    public string ModdedGameDir = Path.Combine(tasksFolder, "modded");
+    public string ModsDir = Path.Combine(tasksFolder, "modded", "Mods");
+    public string MappingsDir = Path.Combine(tasksFolder, "modded", "Mappings");
 
     public AutoExitMode AutoExit = AutoExitMode.Never;
 

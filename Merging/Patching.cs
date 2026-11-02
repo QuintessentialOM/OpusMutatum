@@ -6,9 +6,7 @@ using System.IO;
 namespace OpusMutatum.Merging;
 
 public static class Patching {
-    public static string PathToQuintessential = "Quintessential.dll";
     public static string PathToPatchingDependencies = "";
-
 
     public static void RunMerge(string asmFrom, string asmTo = null, OrderedDictionary<ModMeta, string> dllPaths = null, bool mergeDllMvids = false, bool removeConflictingTypes = false, bool moveXmlDocumentation = false) {
 

@@ -1,5 +1,6 @@
 ﻿using Mono.Cecil;
 using OpusMutatum.Merging;
+using NativeMessageBox;
 using System;
 using System.IO;
 using System.IO.Compression;
@@ -234,6 +235,33 @@ public static class Tasks {
         Console.WriteLine();
     }
 
+    private const int ModdedLaunchButtonId = 100;
+    private const int VanillaLaunchButtonId = 200;
+
+    public static MessageBoxResult ShowLaunchPrompt() {
+        NativeMessageBoxClient.ConfigureHost(options => {
+            options.RequireStaThreadForWindows = true;
+        });
+
+        NativeMessageBoxClient.RegisterLogHandler(message => {
+            Console.WriteLine($"[NativeMessageBox] {message}");
+        });
+
+        var buttons = new[] {
+            new MessageBoxButton(ModdedLaunchButtonId, "Launch modded", MessageBoxButtonKind.Primary, isDefault: true),
+            new MessageBoxButton(VanillaLaunchButtonId, "Launch vanilla", MessageBoxButtonKind.Secondary),
+            new MessageBoxButton(0, "Cancel", MessageBoxButtonKind.Secondary, isCancel: true)
+        };
+
+        var options = new MessageBoxOptions(
+            message: "Select launch option",
+            buttons: buttons,
+            title: "Opus Mutatum",
+            icon: MessageBoxIcon.Information);
+
+        return NativeMessageBoxClient.Show(options);
+    }
+
     public static void HandleRun(string[] args) {
         bool inputArgs = false;
         RunDebugger gameDebugger = new();
@@ -259,23 +287,36 @@ public static class Tasks {
             }
         }
 
-        string pathToIntermediary = Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning);
-        string pathToModded = Path.Combine(Globals.PathToOutput, Globals.PathToModdedLightning);
+        var result = ShowLaunchPrompt();
 
-        string target = File.Exists(pathToModded)
-            ? pathToModded
-            : File.Exists(pathToIntermediary)
-                ? pathToIntermediary
-                : null;
-        if (target is null) {
-            Console.WriteLine("Failed to find target to run!");
-            return;
+        if (result.ButtonId == VanillaLaunchButtonId) {
+            // launch vanilla
+            if (Globals.OperatingSystem == Globals.OS.Windows) {
+                Globals.RunAndWait("Lightning.exe");
+            } else {
+                Globals.RunAndWait("/bin/bash Lightning");
+            }
+        } else if (result.ButtonId == ModdedLaunchButtonId) {
+            // launch modded
+
+            string pathToIntermediary = Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning);
+            string pathToModded = Path.Combine(Globals.PathToOutput, Globals.PathToModdedLightning);
+
+            string target = File.Exists(pathToModded)
+                ? pathToModded
+                : File.Exists(pathToIntermediary)
+                    ? pathToIntermediary
+                    : null;
+            if (target is null) {
+                Console.WriteLine("Failed to find target to run!");
+                return;
+            }
+
+            Console.WriteLine($"Running {Path.GetFileName(target)}...");
+
+            DependencyHandling.SetupNativeLibLoading();
+            AppHosting.RunAssembly(target, gameDebugger.runArgs, debugger: gameDebugger, throwOnInternalError: true);
         }
-
-        Console.WriteLine($"Running {Path.GetFileName(target)}...");
-
-        DependencyHandling.SetupNativeLibLoading();
-        AppHosting.RunAssembly(target, gameDebugger.runArgs, debugger: gameDebugger, throwOnInternalError: true);
     }
 
     public static void HandleCopy(string[] args) {

@@ -87,13 +87,16 @@ public static class Tasks {
         Console.WriteLine("Creating symlinks...");
         ContentHandling.CreateContentSymlinks();
 
+        // steam is stupid and looks in cwd instead of where the executable is
         if (!File.Exists("steam_appid.txt")){
             var file = File.CreateText("steam_appid.txt");
             file.Write("558990");
             file.Flush();
             file.Close();
         }
-        string[] dependecyDlls = [
+        
+        // todo: handle this better
+        string[] dependencyDlls = [
             "libogg-0.dll",
             "libpng16-16.dll",
             "libvorbis-0.dll",
@@ -103,9 +106,10 @@ public static class Tasks {
             "SDL2_image.dll",
             "steam_api64.dll"
         ];
-        foreach (var file in dependecyDlls) {
-            if (!File.Exists(Path.Combine(Globals.PathToOutput, file)) && File.Exists(file))
-                File.Copy(file, Path.Combine(Globals.PathToOutput, file));
+        foreach (var file in dependencyDlls) {
+            string dependencyPath = Path.Combine(Globals.Tasks.VanillaGameDir, file);
+            if (!File.Exists(Path.Combine(Globals.PathToOutput, file)) && File.Exists(dependencyPath))
+                File.Copy(dependencyPath, Path.Combine(Globals.PathToOutput, file));
         }
         Console.WriteLine();
     } // TODO: add caching
@@ -317,6 +321,11 @@ public static class Tasks {
             Console.WriteLine("Both -to and -from have to be specified for the 'copy' task.");
             return;
         }
+        
+        string tasksFolder = Path.GetDirectoryName(Path.Combine(Directory.GetCurrentDirectory(), TaskParser.TasksPath));
+        pathFrom = Path.Combine(tasksFolder, pathFrom);
+        pathTo = Path.Combine(tasksFolder, pathTo);
+        
         if (!Directory.Exists(pathTo)) {
             Directory.CreateDirectory(pathTo);
         }
@@ -414,6 +423,9 @@ public static class Tasks {
         }
 
         var task = System.Threading.Tasks.Task.Run(async () => {
+            string tasksFolder = Path.GetDirectoryName(Path.Combine(Directory.GetCurrentDirectory(), TaskParser.TasksPath));
+            outputPath = Path.Combine(tasksFolder, outputPath);
+            
             string path = Path.Combine(outputPath, name);
             string modPath = Path.Combine(Globals.Tasks.ModsDir, name);
             if (Directory.Exists(path)) Directory.Delete(path, recursive: true);

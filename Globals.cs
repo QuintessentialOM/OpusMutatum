@@ -18,10 +18,10 @@ public static class Globals {
     };
     public static OS OperatingSystem = OS.Windows;
 
-    public static string PathToOutput = "modded";
-    public static string PathToTemporaryOutput = "modded/temp";
+    public static string PathToOutput;
+    public static string PathToTemporaryOutput;
 
-    public static string PathToLightningExe = "Lightning.exe";
+    public static string PathToLightningExe;
 
     public static string PathToLightning = "Lightning.dll";
     public static string PathToIntermediaryLightning = "IntermediaryLightning.dll";

@@ -112,9 +112,8 @@ public static partial class DependencyHandling {
         if (!Directory.Exists(libDestinationDir))
             Directory.CreateDirectory(libDestinationDir);
 
-        foreach (string libSrc in sourceLibPaths) {
-            if (!Directory.Exists(libSrc))
-                continue;
+        foreach (string lib in sourceLibPaths) {
+            string libSrc = Path.Combine(Globals.Tasks.VanillaGameDir, lib);
 
             if (File.Exists(libSrc)) {
                 string libDst = Path.Combine(libDestinationDir, Path.GetFileName(libSrc));
@@ -162,7 +161,7 @@ public static partial class DependencyHandling {
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "Platform compatibility is checked with custom system.")]
     public static void SetupNativeLibLoading() {
-        string baseNativeLibPath = Path.Combine(AppContext.BaseDirectory, Globals.PathToOutput);
+        string baseNativeLibPath = Path.GetRelativePath(AppContext.BaseDirectory, Globals.PathToOutput);
 
         switch (Globals.OperatingSystem) {
             case Globals.OS.Windows:

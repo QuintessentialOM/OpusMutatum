@@ -423,7 +423,7 @@ public static partial class Remapping {
 
     #region Remapping
 
-    public static string PathToMappings = "modded/Mappings";
+    public static string PathToMappings;
     public static string PathToIntermediary = "intermediary";
     public static string PathToNamed = "named";
 

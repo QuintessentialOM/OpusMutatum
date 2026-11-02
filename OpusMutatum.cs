@@ -8,16 +8,19 @@ namespace OpusMutatum;
 
 public static class OpusMutatum {
     #region Program
-
+    
+    private static List<string> extraStringPaths = [];
+    private static List<string> extraIntermediaryMappingPaths = [], extraNamedMappingPaths = [];
+    
     private static AutoExitMode autoExit = AutoExitMode.Never;
 
     private enum ArgumentParsingMode {
         Argument,
-        IntermediaryToNamedMappingPath,
-        ObfToIntermediaryMappingPath,
-        StringsPath,
+        TasksPath,
         LightningExePath,
-        QuintessentialPath
+        StringsPath,
+        ObfToIntermediaryMappingPath,
+        IntermediaryToNamedMappingPath
     }
 
     private static void Main(string[] args) {
@@ -60,10 +63,6 @@ public static class OpusMutatum {
 
     private static void HandleArguments(string[] args) {
         ArgumentParsingMode current = ArgumentParsingMode.Argument;
-        bool lightningExePathModified = false;
-
-        List<string> extraStringPaths = [];
-        List<string> extraIntermediaryMappingPaths = [], extraNamedMappingPaths = [];
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             Globals.OperatingSystem = Globals.OS.Windows;
@@ -75,17 +74,17 @@ public static class OpusMutatum {
         foreach (string arg in args) {
             switch (current) {
                 case ArgumentParsingMode.Argument:
-                    // check if its "--mappings", "--intermediary", "--strings", "--lightning", "--quintessential", "--intermediaryPath", "--linux", "--mac", --"win"
-                    if (arg.Equals("--mappings"))
-                        current = ArgumentParsingMode.IntermediaryToNamedMappingPath;
-                    else if (arg.Equals("--intermediary"))
-                        current = ArgumentParsingMode.ObfToIntermediaryMappingPath;
-                    else if (arg.Equals("--strings"))
-                        current = ArgumentParsingMode.StringsPath;
+                    // check if its "--mappings", "--intermediary", "--strings", "--lightning", "--tasks", "--linux", "--mac", --"win"
+                    if (arg.Equals("--tasks"))
+                        current = ArgumentParsingMode.TasksPath;
                     else if (arg.Equals("--lightning"))
                         current = ArgumentParsingMode.LightningExePath;
-                    else if (arg.Equals("--quintessential"))
-                        current = ArgumentParsingMode.QuintessentialPath;
+                    else if (arg.Equals("--strings"))
+                        current = ArgumentParsingMode.StringsPath;
+                    else if (arg.Equals("--intermediary"))
+                        current = ArgumentParsingMode.ObfToIntermediaryMappingPath;
+                    else if (arg.Equals("--mappings"))
+                        current = ArgumentParsingMode.IntermediaryToNamedMappingPath;
                     else if (arg.Equals("--linux"))
                         Globals.OperatingSystem = Globals.OS.Linux;
                     else if (arg.Equals("--mac"))
@@ -95,11 +94,20 @@ public static class OpusMutatum {
                     else if (arg.Equals("--autoExit"))
                         autoExit = AutoExitMode.OnSuccess;
                     break;
+                
+                case ArgumentParsingMode.TasksPath:
+                    TaskParser.TasksPath = arg;
+                    current = ArgumentParsingMode.Argument;
+                    break;
 
                 case ArgumentParsingMode.LightningExePath:
                     Globals.PathToLightningExe = arg;
                     current = ArgumentParsingMode.Argument;
-                    lightningExePathModified = true;
+                    break;
+                
+                case ArgumentParsingMode.StringsPath:
+                    extraStringPaths.Add(arg);
+                    current = ArgumentParsingMode.Argument;
                     break;
 
                 case ArgumentParsingMode.ObfToIntermediaryMappingPath:
@@ -111,28 +119,11 @@ public static class OpusMutatum {
                     current = ArgumentParsingMode.Argument;
                     break;
 
-                case ArgumentParsingMode.StringsPath:
-                    extraStringPaths.Add(arg);
-                    current = ArgumentParsingMode.Argument;
-                    break;
-
-                case ArgumentParsingMode.QuintessentialPath:
-                    Patching.PathToQuintessential = arg;
-                    current = ArgumentParsingMode.Argument;
-                    break;
-
                 default:
                     Console.WriteLine($"Invalid argument \"{arg}\"!");
                     break;
             }
         }
-
-        if (!lightningExePathModified && Globals.OperatingSystem == Globals.OS.MacOS) {
-            Globals.PathToLightningExe = "Opus Magnum.app/Contents/Resources/Lightning.exe";
-        }
-
-        StringDumping.LoadStringsPaths(extraStringPaths);
-        Remapping.LoadMappingsPaths(extraIntermediaryMappingPaths, extraNamedMappingPaths);
     }
 
     private static void RunTask(Task task) {
@@ -175,16 +166,23 @@ public static class OpusMutatum {
     }
 
     private static void HandleSetup() {
-        Globals.PathToOutput = Globals.Tasks.GameDir;
-        Globals.PathToTemporaryOutput = Path.Combine(Globals.Tasks.GameDir, "temp");
-        ModLoader.PathToMods = Globals.Tasks.ModsDir;
-        ModLoader.PathToUnpackedMods = Path.Combine(Globals.Tasks.GameDir, "UnpackedMods");
-        Remapping.PathToMappings = Globals.Tasks.MappingsDir;
-
-        autoExit = autoExit == AutoExitMode.Never ? Globals.Tasks.AutoExit : autoExit;
-
+        Globals.PathToOutput = Globals.Tasks.ModdedGameDir;
+        Globals.PathToTemporaryOutput = Path.Combine(Globals.Tasks.ModdedGameDir, "temp");
+        Globals.PathToLightningExe ??= Globals.OperatingSystem == Globals.OS.MacOS
+            ? "Opus Magnum.app/Contents/Resources/Lightning.exe"
+            : Path.Combine(Globals.Tasks.VanillaGameDir, "Lightning.exe");
         Directory.CreateDirectory(Globals.PathToOutput);
         Directory.CreateDirectory(Globals.PathToTemporaryOutput);
+        
+        StringDumping.LoadStringsPaths(extraStringPaths);
+        
+        Remapping.PathToMappings = Globals.Tasks.MappingsDir;
+        Remapping.LoadMappingsPaths(extraIntermediaryMappingPaths, extraNamedMappingPaths);
+        
+        ModLoader.PathToMods = Globals.Tasks.ModsDir;
+        ModLoader.PathToUnpackedMods = Path.Combine(Globals.Tasks.ModdedGameDir, "UnpackedMods");
+
+        autoExit = autoExit == AutoExitMode.Never ? Globals.Tasks.AutoExit : autoExit;
     }
     private static void HandleCleanup() {
         Directory.Delete(Globals.PathToTemporaryOutput, recursive: true);

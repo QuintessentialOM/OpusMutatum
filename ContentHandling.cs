@@ -7,8 +7,8 @@ public static class ContentHandling {
     private static string PathToPackedContent = "PackedContent";
 
     public static void CreateContentSymlinks() {
-        string vanillaPathToContent = Path.Combine(Directory.GetCurrentDirectory(), PathToContent),
-            vanillaPathToPackedContent = Path.Combine(Directory.GetCurrentDirectory(), PathToPackedContent);
+        string vanillaPathToContent = Path.Combine(Globals.Tasks.VanillaGameDir, PathToContent),
+            vanillaPathToPackedContent = Path.Combine(Globals.Tasks.VanillaGameDir, PathToPackedContent);
         string moddedPathToContent = Path.Combine(Globals.PathToOutput, PathToContent),
             moddedPathToPackedContent = Path.Combine(Globals.PathToOutput, PathToPackedContent);
 

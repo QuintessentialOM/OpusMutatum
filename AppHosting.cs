@@ -13,11 +13,13 @@ public static partial class AppHosting {
     private static partial Regex FrameworkVersionRegex();
 
     public static void RunAssembly(string assembly, string[] args = null, string[] manualDependencies = null, RunDebugger debugger = null, bool throwOnInternalError = false) {
+        assembly = Path.GetFullPath(assembly);
+        
         CreateRuntimeConfigFiles(assembly, manualDependencies);
 
         string argsString = args is not null
-            ? $"{assembly} {string.Join(' ', args)}"
-            : assembly;
+            ? $"\"{assembly}\" {string.Join(' ', args)}"
+            : $"\"{assembly}\"";
         Globals.RunAndWaitDotnet(argsString, debugger, throwOnInternalError);
     }
 
@@ -123,10 +125,12 @@ public static partial class AppHosting {
         }
     }
 
-    public static void RunExe(string exe, bool throwOnInternalError = false)
-        => Globals.RunAndWait(Globals.OperatingSystem switch {
+    public static void RunExe(string exe, bool throwOnInternalError = false) {
+        exe = Path.GetFullPath(exe);
+        Globals.RunAndWait(Globals.OperatingSystem switch {
             Globals.OS.Windows => $"\"{exe}\"", // TODO: i don't know how windows works
-            Globals.OS.Linux or Globals.OS.MacOS => $"mono {exe}", // TODO: i don't know how macos works
+            Globals.OS.Linux or Globals.OS.MacOS => $"mono {exe.Replace(" ", "\\ ")}", // TODO: i don't know how macos works. also mono is evil
             _ => throw new ArgumentOutOfRangeException()
         }, throwOnInternalError: throwOnInternalError);
+    }
 }

@@ -231,12 +231,12 @@ public static class StringDumping {
         // copy dependency dlls to the directory directly since the dumper is a framework binary :(
         foreach (string dependency in StringDumpingDependencies) {
             string source = Globals.OperatingSystem switch {
-                Globals.OS.Windows or Globals.OS.Linux => dependency,
+                Globals.OS.Windows or Globals.OS.Linux => Path.Combine(Globals.Tasks.VanillaGameDir, dependency),
                 Globals.OS.MacOS => Path.Combine("Opus Magnum.app/Contents/Resources", dependency),
                 _ => throw new ArgumentOutOfRangeException()
             };
             if (Globals.OperatingSystem == Globals.OS.MacOS && !File.Exists(dependency))
-                File.Copy(source, dependency);
+                File.Copy(source, dependency); // todo: should this really go in cwd?
             string destination = Path.Combine(directory, dependency);
             if (!File.Exists(destination))
                 File.Copy(source, destination);

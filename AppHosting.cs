@@ -13,7 +13,7 @@ public static partial class AppHosting {
     private static partial Regex FrameworkVersionRegex();
 
     public static void RunAssembly(string assembly, string[] args = null, string[] manualDependencies = null, RunDebugger debugger = null, bool throwOnInternalError = false) {
-        assembly = Path.GetFullPath(assembly);
+        assembly = Path.GetFullPath(assembly); // dotnet doesn't like weird paths
         
         CreateRuntimeConfigFiles(assembly, manualDependencies);
 
@@ -126,11 +126,13 @@ public static partial class AppHosting {
     }
 
     public static void RunExe(string exe, bool throwOnInternalError = false) {
-        exe = Path.GetFullPath(exe);
-        Globals.RunAndWait(Globals.OperatingSystem switch {
+        exe = Path.GetFullPath(exe); // mono doesn't like weird paths
+
+        string command = Globals.OperatingSystem switch {
             Globals.OS.Windows => $"\"{exe}\"", // TODO: i don't know how windows works
             Globals.OS.Linux or Globals.OS.MacOS => $"mono {exe.Replace(" ", "\\ ")}", // TODO: i don't know how macos works. also mono is evil
             _ => throw new ArgumentOutOfRangeException()
-        }, throwOnInternalError: throwOnInternalError);
+        };
+        Globals.RunAndWait(command, throwOnInternalError: throwOnInternalError);
     }
 }

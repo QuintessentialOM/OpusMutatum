@@ -13,14 +13,13 @@ public static partial class AppHosting {
     private static partial Regex FrameworkVersionRegex();
 
     public static void RunAssembly(string assembly, string[] args = null, string[] manualDependencies = null, RunDebugger debugger = null, bool throwOnInternalError = false) {
-        assembly = Path.GetFullPath(assembly); // dotnet doesn't like weird paths
-        
         CreateRuntimeConfigFiles(assembly, manualDependencies);
 
-        string argsString = args is not null
-            ? $"\"{assembly}\" {string.Join(' ', args)}"
-            : $"\"{assembly}\"";
-        Globals.RunAndWaitDotnet(argsString, debugger, throwOnInternalError);
+        string assemblyPath = assembly.EscapePath(); // dotnet doesn't like weird paths
+        string command = args is not null
+            ? $"{assemblyPath} {string.Join(' ', args)}"
+            : assemblyPath;
+        Globals.RunAndWaitDotnet(command, debugger, throwOnInternalError);
     }
 
     public static void CreateRuntimeConfigFiles(string assembly, string[] manualDependencies = null) {
@@ -126,11 +125,11 @@ public static partial class AppHosting {
     }
 
     public static void RunExe(string exe, bool throwOnInternalError = false) {
-        exe = Path.GetFullPath(exe); // mono doesn't like weird paths
+        exe = exe.EscapePath(); // mono doesn't like weird paths
 
         string command = Globals.OperatingSystem switch {
-            Globals.OS.Windows => $"\"{exe}\"", // TODO: i don't know how windows works
-            Globals.OS.Linux or Globals.OS.MacOS => $"mono {exe.Replace(" ", "\\ ")}", // TODO: i don't know how macos works. also mono is evil
+            Globals.OS.Windows => $"{exe}", // TODO: i don't know how windows works
+            Globals.OS.Linux or Globals.OS.MacOS => $"mono {exe}", // TODO: i don't know how macos works
             _ => throw new ArgumentOutOfRangeException()
         };
         Globals.RunAndWait(command, throwOnInternalError: throwOnInternalError);

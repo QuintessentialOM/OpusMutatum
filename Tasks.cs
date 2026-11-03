@@ -1,6 +1,7 @@
 ﻿using Mono.Cecil;
 using OpusMutatum.Merging;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Xml.Linq;
@@ -378,8 +379,9 @@ public static class Tasks {
 
     public static void HandleExport(string[] args) {
         string name = "";
-        string outputPath = "";
-        bool asName = false, asOutputPath = false;
+        string outputPath = "", outputName = null;
+        string only = null;
+        bool asName = false, asOutputPath = false, asOutputName = false, asOnly = false;
         foreach (var item in args) {
             if (asName) {
                 asName = false;
@@ -387,6 +389,12 @@ public static class Tasks {
             } else if (asOutputPath) {
                 asOutputPath = false;
                 outputPath = item.Trim(['"']);
+            } else if (asOutputName) {
+                asOutputName = false;
+                outputName = item.Trim(['"']);
+            } else if (asOnly) {
+                asOnly = false;
+                only = item.Trim(['"']);
             } else {
                 switch (item) {
                     case "-name":
@@ -394,6 +402,12 @@ public static class Tasks {
                         break;
                     case "-outputPath":
                         asOutputPath = true;
+                        break;
+                    case "-outputName":
+                        asOutputName = true;
+                        break;
+                    case "-only":
+                        asOnly = true;
                         break;
                     default:
                         Console.WriteLine($"Invalid Argument '{item}' for 'export' task.");
@@ -417,17 +431,53 @@ public static class Tasks {
             Console.WriteLine("[Exporter] Started exporting mod: " + name);
             Directory.CreateDirectory(path);
             try {
-
-                var allDirectories = Directory.GetDirectories(modPath, "*", SearchOption.AllDirectories);
-                foreach (string dir in allDirectories) {
-                    string dirToCreate = dir.Replace(modPath, path);
-                    Directory.CreateDirectory(dirToCreate);
-                }
                 var allFiles = Directory.GetFiles(modPath, "*.*", SearchOption.AllDirectories);
-                foreach (string filePath in allFiles) {
-                    File.Copy(filePath, filePath.Replace(modPath, path), true);
-                }
+                HashSet<string> copiedFiles = [];
+                
+                // mediocre glob parser because i don't want to pull in a random extension library
+                string[] globs = (only ?? "**/*.*").Replace("\\", "/").Split(";");
+                foreach (string glob in globs) {
+                    if (string.IsNullOrEmpty(glob))
+                        continue;
 
+                    string[] parts = glob.Split("/");
+                    string[] matchDirectories = parts[..^1]; string matchFileName = parts[^1];
+                    bool matchExtraDirectories = false;
+                    if (matchDirectories.Length >= 1 && matchDirectories[^1] == "**") {
+                        matchDirectories = matchDirectories[..^1];
+                        matchExtraDirectories = true;
+                    }
+                    
+                    foreach (string filePath in allFiles) {
+                        if (copiedFiles.Contains(filePath))
+                            continue;
+                        
+                        string relativeFilePath = Path.GetRelativePath(modPath, filePath);
+                        string directory = Path.GetDirectoryName(relativeFilePath);
+                        string fileName = Path.GetFileName(relativeFilePath);
+
+                        string[] directories = string.IsNullOrEmpty(directory) ? [] : directory.Split(Path.DirectorySeparatorChar);
+                        bool matchesDirectory = true;
+                        for (int i = 0; i < matchDirectories.Length; i++) {
+                            if (i < directories.Length && directories[i].MatchesWithWildcards(matchDirectories[i]))
+                                continue;
+                            
+                            matchesDirectory = false;
+                            break;
+                        }
+                        if (!matchExtraDirectories && directories.Length > matchDirectories.Length)
+                            matchesDirectory = false;
+                        bool matchesFilename = fileName.MatchesWithWildcards(matchFileName);
+                        if (!matchesDirectory || !matchesFilename)
+                            continue;
+                        
+                        string newFilePath = Path.Combine(path, relativeFilePath);
+                        Directory.CreateDirectory(Path.GetDirectoryName(newFilePath));
+                        File.Copy(filePath, newFilePath, true);
+                        
+                        copiedFiles.Add(filePath);
+                    }
+                }
 
                 ModMeta mod;
                 string metaPath = Path.Combine(path, ModLoader.modMetaFileName);
@@ -463,7 +513,8 @@ public static class Tasks {
                     File.Delete(metaPath);
                 mod.Serialize(metaPath);
 
-                string zipPath = Path.Combine(outputPath, name + "_" + mod.Version.ToString() + ".zip");
+                string zipName = (outputName ?? name + "_{version}.zip").Replace("{version}", mod.Version.ToString());
+                string zipPath = Path.Combine(outputPath, zipName);
                 if (File.Exists(zipPath)) File.Delete(zipPath);
                 ZipFile.CreateFromDirectory(path, zipPath);
                 Console.WriteLine("[Exporter] Finished mod: " + name);

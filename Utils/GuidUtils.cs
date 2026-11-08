@@ -34,6 +34,35 @@ internal static class GuidUtils {
         }
         return new(stringId);
     }
+    public static Guid AsDeterministicGuid(int i) {
+        byte[] bytes = BitConverter.GetBytes(i);
+
+        int hash = 17;
+        foreach (byte c in bytes) {
+            hash = hash * 23 + c;
+        }
+        var intId = new byte[16];
+        for (int j = 0; j < 16; j++) {
+            intId[j] = (byte)hash;
+            hash = hash * 29 + bytes[Math.Abs(hash) % bytes.Length];
+        }
+        return new(intId);
+    }
+
+    public static Guid MergeGuids(IEnumerable<Guid> guids) {
+        List<byte[]> guidBytes = [..guids.Select(guid => guid.ToByteArray())];
+
+        if (guidBytes.Count == 1) return new(guidBytes[0]);
+
+        var idBytes = new byte[16];
+        for (int i = 0; i < 16; i++) {
+            idBytes[i] = 17;
+            for (int j = 0; j < guidBytes.Count; j++) {
+                idBytes[i] = (byte)(idBytes[i] * 29 + guidBytes[j][i]);
+            }
+        }
+        return new(idBytes);
+    }
 
     public static Guid MergeAssemblyMvids(string[] paths) {
         List<byte[]> guidBytes = [];

@@ -220,17 +220,25 @@ public static class Tasks {
 
     public static void HandleNamed(bool onlyOnChange) {
         // take IntermediaryLightning.exe, remap to named (no merged quintessential)
-        if (onlyOnChange && GuidUtils.SameMvidAssemblies(Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning), Path.Combine(Globals.PathToOutput, Globals.PathToNamedLightning))) {
-            Console.WriteLine("Found cache, skipping named assembly generation.");
-            return;
-        }
+        //if (onlyOnChange && GuidUtils.SameMvidAssemblies(Path.Combine(Globals.PathToOutput, Globals.PathToIntermediaryLightning), Path.Combine(Globals.PathToOutput, Globals.PathToNamedLightning))) {
+        //    Console.WriteLine("Found cache, skipping named assembly generation.");
+        //    return;
+        //}
         if (!Globals.TryLoadIntermediaryLightning(out AssemblyDefinition intermediaryLightning))
             return;
 
         Console.WriteLine("Generating named assembly...");
-        Remapping.RemapToNamed(intermediaryLightning);
 
-        intermediaryLightning.Write(Path.Combine(Globals.PathToOutput, Globals.PathToNamedLightning));
+        Guid sourceVersionId = intermediaryLightning.GetMvid();
+        Guid? previousVersionId = null;
+        if (onlyOnChange && File.Exists(Path.Combine(Globals.PathToOutput, Globals.PathToNamedLightning))) {
+            previousVersionId = GuidUtils.MergeAssemblyMvids([Path.Combine(Globals.PathToOutput, Globals.PathToNamedLightning)]);
+        }
+
+        bool wasRemapped = Remapping.RemapToNamed(intermediaryLightning, previousVersionId: previousVersionId, sourceVersionId: sourceVersionId);
+
+        if(wasRemapped)
+            intermediaryLightning.Write(Path.Combine(Globals.PathToOutput, Globals.PathToNamedLightning));
         Console.WriteLine();
     }
 
@@ -248,9 +256,6 @@ public static class Tasks {
                         break;
                     case "--attachDebugger":
                         gameDebugger.attachDebugger = true;
-                        break;
-                    case "--readLogs":
-                        gameDebugger.readLogs = true;
                         break;
                     default:
                         Console.WriteLine($"Invalid Argument '{item}' for 'run' task.");

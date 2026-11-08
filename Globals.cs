@@ -123,6 +123,7 @@ public static class Globals {
             _ => new ProcessStartInfo()
         };
         startInfo.RedirectStandardOutput = true;
+        startInfo.RedirectStandardError = true;
         startInfo.UseShellExecute = false;
 
         switch (Globals.OperatingSystem) {
@@ -139,16 +140,16 @@ public static class Globals {
 
         Process process = new() { StartInfo = startInfo };
         debugger?.BeforeProcessStart();
+        // TODO: could mirror log output to file, etc, if we want?
+        process.OutputDataReceived += (sender, args) => Console.WriteLine(args.Data);
+        process.ErrorDataReceived += (sender, args) => Console.Error.WriteLine(args.Data);
         process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
         debugger?.HandleRunningProcess(process);
         process.WaitForExit();
 
         Console.WriteLine($"Process exited with code {process.ExitCode}.");
-        string output = process.StandardOutput.ReadToEnd();
-        if (!string.IsNullOrEmpty(output)) {
-            Console.WriteLine("Process output:");
-            Console.WriteLine(output);
-        }
         if (throwOnInternalError && process.ExitCode != 0) throw new InternalProcessError($"Failed to run command '{command}'");
     }
     public static void RunAndWaitDotnet(string argsString, RunDebugger debugger = null, bool throwOnInternalError = false) {

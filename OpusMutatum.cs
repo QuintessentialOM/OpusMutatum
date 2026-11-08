@@ -1,4 +1,5 @@
 ﻿using OpusMutatum.Merging;
+using OpusMutatum.Utils;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -126,6 +127,7 @@ public static class OpusMutatum {
                     break;
             }
         }
+        if (Globals.OperatingSystem == Globals.OS.Windows) WindowsConsoleFixer.MakeMyWindowsConsoleBehave();
 
         if (!lightningExePathModified && Globals.OperatingSystem == Globals.OS.MacOS) {
             Globals.PathToLightningExe = "Opus Magnum.app/Contents/Resources/Lightning.exe";

@@ -11,6 +11,9 @@ namespace OpusMutatum;
 static public class ModLoader {
     internal const string modMetaFileName = "modMeta.jsonc";
     private const string validModIdChars = "abcdefghijklmnopqrstuvwxyz_0123456789";
+    private static readonly string[] reservedModIds = [
+        "om"
+    ];
 
     public static string PathToMods;
     public static string PathToUnpackedMods;
@@ -133,8 +136,7 @@ static public class ModLoader {
                 meta.PathToDirectory = dir;
                 meta.PathToArchive = null;
 
-                if (!meta.ModId.All(ch => validModIdChars.Contains(ch)))
-                    throw new Exception($"Failed parsing {modMetaFileName} in {dir}, invalid mod id: '{meta.ModId}'.");
+                ValidateModId(meta.ModId, modMetaFileName, dir);
                 Mods.Add(meta);
                 Log($"Queuing mod \"{meta.ModId}\", version {meta.Version}.");
             } catch (Exception e) {
@@ -165,10 +167,22 @@ static public class ModLoader {
             meta.PathToDirectory = null;
             meta.PathToArchive = archivePath;
 
-            if (!meta.ModId.All(ch => validModIdChars.Contains(ch)))
-                throw new Exception($"Failed parsing {modMetaFileName} in {archivePath}, invalid mod id: '{meta.ModId}'.");
+            ValidateModId(meta.ModId, modMetaFileName, archivePath);
             Mods.Add(meta);
             Log($"Queuing mod \"{meta.ModId}\", version {meta.Version}.");
+        }
+    }
+
+    private static void ValidateModId(string modId, string fileName, string path) {
+
+        if (!modId.All(validModIdChars.Contains)) {
+            throw new Exception($"Failed parsing {fileName} in {path}, invalid mod id: '{modId}'.");
+        }
+        if (reservedModIds.Contains(modId)) {
+            throw new Exception($"Failed parsing {fileName} in {path}, with reserved mod id: '{modId}'.");
+        }
+        if (modId.Length <= 1) {
+            throw new Exception($"Failed parsing {fileName} in {path}, with too short mod id: '{modId}'.");
         }
     }
 

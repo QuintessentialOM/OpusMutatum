@@ -66,7 +66,7 @@ public static partial class Remapping {
 		public string GenericNameB { get; set; }
 	}
 
-    private record NamedMappings(Dictionary<string, string> Mappings, Dictionary<string, Dictionary<int, string>> AddedEnumVariants);
+    private record NamedMappings(Dictionary<string, string> Mappings, Dictionary<string, Dictionary<int, string>> AddedEnumVariants, Guid VersionId);
     private record Backmapper(Mappings Mappings, Dictionary<string, Dictionary<int, string>> RemovedEnumVariants);
 
     #endregion
@@ -516,6 +516,7 @@ public static partial class Remapping {
                 }
             }
         }
+        List<Guid> fileWriteTimes = [];
         foreach (var path in pathsForVersion) {
             string[] lines = File.ReadAllLines(path);
 
@@ -542,10 +543,12 @@ public static partial class Remapping {
                     mappings[parts[0]] = parts[1];
                 }
             }
+            fileWriteTimes.Add(GuidUtils.AsDeterministicGuid(File.GetLastWriteTimeUtc(path).GetHashCode()));
             if (logConsoleNormal) Console.WriteLine($"Found valid named mappings: {Path.GetFileName(path)}");
         }
+        Guid versionId = fileWriteTimes.Count == 0 ? Guid.NewGuid() : GuidUtils.MergeGuids(fileWriteTimes);
 
-        namedMappings = new NamedMappings(mappings, addedEnumVariants);
+        namedMappings = new NamedMappings(mappings, addedEnumVariants, versionId);
         IntermediaryToNamedMappings = new(mappingVersion, namedMappings);
 
         if (mappings.Count == 0) {
@@ -595,15 +598,27 @@ public static partial class Remapping {
         }
     }
 
-    public static void RemapToNamed(AssemblyDefinition intermediaryAssemblyDef, bool logConsoleNormal = true) {
+    public static bool RemapToNamed(AssemblyDefinition intermediaryAssemblyDef, bool logConsoleNormal = true, Guid? previousVersionId = null, Guid? sourceVersionId = null) {
         if (!TryLoadIntermediaryToNamedMappings(out NamedMappings namedMappings, out var _, logConsoleNormal))
-            return;
+            return false;
+
+        if (previousVersionId.HasValue && sourceVersionId.HasValue) {
+            Guid merged = GuidUtils.MergeGuids([sourceVersionId.Value, namedMappings.VersionId]);
+            if (previousVersionId.Value == merged) {
+                if (logConsoleNormal) Console.WriteLine("Found cache, skipping named assembly generation.");
+                return false;
+            } else {
+                intermediaryAssemblyDef.MainModule.Mvid = merged;
+            }
+
+        }
 
         var allTypes = StringDumping.CollectNestedTypes(intermediaryAssemblyDef.MainModule.Types);
 
         EnumVariantInjection.AddEnumVariants(allTypes, namedMappings.AddedEnumVariants);
 
         DoRemap(new NamedRemapper(namedMappings.Mappings), allTypes);
+        return true;
     }
 
 
